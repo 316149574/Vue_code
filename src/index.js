@@ -1,5 +1,4 @@
 import { initMixin } from "./init";
-
 // 定义Vue构造函数 
 function Vue(options) {
     this._init(options);  // options vue实例的配置项{ el data methods等}
