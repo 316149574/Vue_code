@@ -9,26 +9,16 @@
    
 </head>
 <body>
-<div id="app"> 
+<div id="app" class="div1">
+    <h3>title</h3>
     {{name}}
-    <ul>
-        <li v-for="item in person">
-            <h3>{{name}}</h3>
-            <span>{{age}}</span>
-        </li>
-    </ul>
 </div>  
 
 <script>
     let vm = new Vue({
         el:"#app",
         data:{
-            name:"xiaoming",
-            person:{
-                name:"duanli",
-                age:12,
-                score:[100,80,50,80]
-            }
+            name:"xiaoming"
         }
     });
    
