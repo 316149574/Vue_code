@@ -2,12 +2,13 @@ const ncname = `[a-zA-Z_][\\-\\.0-9_a-zA-Z]*`;  // 标签名
 const qnameCapture = "((?:".concat(ncname, "\\:)?").concat(ncname, ")");
 // aa:xx 命令空间  用来获取标签名  match后索引为1的为匹配到的标签名   let r =  '<div></div>'.match(qnameCapture);
 const startTagOpen = new RegExp("^<".concat(qnameCapture));  // 匹配开始标签
-const startTagClose = /^\s*(\/?)>/;   //   />  <div/> 
+const startTagClose = /^\s*(\/?)>/;   //   />      <div/> 
 const defaultTagRE = /\{\{((?:.|\r?\n)+?)\}\}/g; // {{  }}
 //  匹配属性  a=b  a="b"  a='b' 三种情况      aa  =  “  XXX ” | ‘  XXX  ’  |  XXX
 const attribute = /^\s*([^\s"'<>\/=]+)(?:\s*(=)\s*(?:"([^"]*)"+|'([^']*)'+|([^\s"'=<>`]+)))?/;
 const endTag = new RegExp("^<\\/".concat(qnameCapture, "[^>]*>")); // 匹配闭合标签 </xxxx   >
 //  html标签解析成DOM树 <div id="app"> {{name}}</div>   
+
 export function compileToFunction(template) {
     parserHTML(template);
 }
@@ -26,6 +27,7 @@ function parserHTML(html) {
                 attrs: []
             }
             advance(start[0].length); //  id="app"> {{name}}</div>
+           
             // 匹配属性
             let end;
             let attr;

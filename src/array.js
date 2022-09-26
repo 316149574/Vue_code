@@ -9,11 +9,11 @@ methods.forEach(method => {
         oldArrayPrototype[method].call(this, ...args)
 
         //  如果数组方法新添加的值是一个对象 则同样需要进行观测
-        let inserted;  // 新添加的值
+        let inserted;  // 新添加的值  
         switch (method) {
             case 'push':
             case 'unshift':
-                inserted = args;
+                inserted = args;  // 类数组
                 break;
             case 'splice':
                 inserted = args.slice(2);

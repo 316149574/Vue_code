@@ -7,7 +7,6 @@ export function initState(vm) {
     initData(vm);
   }
 }
-
 function initData(vm) {
   let data = vm.$options.data;
   // 此时data和vm没有任何关系  data = isfn(data) ? data.call(vm) : data;  解决：
@@ -18,8 +17,7 @@ function initData(vm) {
   }
   observe(data);
 }
-
-// 属性代理  当调用vm.name 则在 vm._data.name获取
+// 数据代理  当调用vm.name 则在 vm._data.name获取
 function proxy(vm, source, key) {
   Object.defineProperty(vm, key, {
     get() {

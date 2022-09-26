@@ -25,6 +25,7 @@ class Observer {
          // 数据劫持的逻辑  劫持数组的变异方法（变异方法:指操作方法可能会改变原数组如： push shift pop 而contact不是变异方法，因其不会改变原数组）
          // 对数组原来的方法进行改写（重写？）----> 切片编程 高阶函数
          data.__proto__ = arrayMethods;
+         
          // 如果数组中的数据是对象，则需要对对象进行劫持 [{key:value}, {key:value}]
          this.observeArray(data);
 
@@ -52,7 +53,6 @@ function defineReactive(data, key, value) {
          return value;
       },
       set(newValue) {
-
          // todo 用户更改了数据.....
          observe(newValue); // 如果对象的某个属性重新赋的值也是一个对象，则也需要被劫持。
          value = newValue;
@@ -64,7 +64,10 @@ function defineReactive(data, key, value) {
  * 问题： 给data添加属性会被劫持到吗？
  * 
  *总结 ： 如果是对象，会对对象进行递归劫持
+
          如果是数组 会劫持数组的方法，并对数组中不是基本数据类型的数据进行检测 
+ * 
+ * 
  * 
  * 
  * 

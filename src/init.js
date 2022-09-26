@@ -5,16 +5,15 @@ export function initMixin(Vue) {
     Vue.prototype._init = function (options) {
         const vm = this;
         vm.$options = options;
-
         // 对数据进行初始化 data el methods computed props
         initState(vm);
 
         // 模板编译
-        if(vm.$options.el){
-            //  将数据挂载到模板上
+        if(vm.$options.el){   
             vm.$mount(vm.$options.el);
         }
     }
+    //  将数据挂载到模板上
     Vue.prototype.$mount=function(el){
         const vm = this;
         const options = vm.$options;
@@ -27,7 +26,6 @@ export function initMixin(Vue) {
                  let render = compileToFunction(template);
                  options.render = render;  // options.render函数就是渲染函数
             }
-
         }
     }
 }
