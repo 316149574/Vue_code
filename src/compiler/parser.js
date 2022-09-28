@@ -79,8 +79,9 @@ export function parserHTML(html) {
 }
 
 let root = null;
-let stack = []; // 用于存放解析标签
+let stack = []; // 用于存放解析标签   >>>>栈 先进后出
 
+//  匹配到一个节点： 标记节点的父亲是谁 ，父亲的儿子是当次匹配的节点 （双向标记）
 function start(tagName, attributes) {
   let parent = stack[stack.length - 1];
   let element = createAstElement(tagName, attributes);
