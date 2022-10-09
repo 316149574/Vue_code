@@ -4,6 +4,8 @@
   (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.Vue = factory());
 })(this, (function () { 'use strict';
 
+  var defaultTagRE = /\{\{((?:.|\r?\n)+?)\}\}/g; // {{  }}
+
   function genProps(attrs) {
     // attrs  [{ name :id , value: app}, { name:XXX,value:XXX}]
     var str = "";
@@ -33,7 +35,35 @@
       return generate(el);
     } else {
       var text = el.text;
-      return "_v(\"".concat(text, "\")");
+
+      if (!defaultTagRE.test(text)) {
+        // '_v(hello)'
+        return "_v(\"".concat(text, "\")");
+      } else {
+        //有大括号情况 hello{{data}}world =====>  '_v("hello"+ data+ "world")'
+        var match;
+        var tokens = [];
+        var lastIndex = defaultTagRE.lastIndex = 0;
+
+        while (match = defaultTagRE.exec(text)) {
+          //hello{{data}}world
+          var index = match.index;
+
+          if (index > lastIndex) {
+            // 说明捕获到了
+            tokens.push(JSON.stringify(text.slice(lastIndex, index)));
+          }
+
+          tokens.push("_s(".concat(match[1].trim(), ")"));
+          lastIndex = index + match[0].length;
+        }
+
+        if (lastIndex < text.length) {
+          tokens.push(JSON.stringify(text.slice(lastIndex)));
+        }
+
+        return "_v(".concat(tokens.join('+'), ")");
+      }
     }
   }
 
@@ -43,7 +73,7 @@
     if (children) {
       return children.map(function (c) {
         return gen(c);
-      }).join(',');
+      }).join(",");
     }
 
     return false;
@@ -204,6 +234,19 @@
     console.log(root);
     console.log(code);
   }
+  /*
+  console.log(root);
+  {tag: 'div', type: 1, children: Array(3), parent: null, attrs: Array(3)}
+
+  console.log(code);
+  _c(
+    "div",
+    { id: "app", class: "div1", style: { width: "100px", " height": "100px" } },
+    _c("h3", { class: "title" }, _v("title")),
+    _v("{{name}}"),
+    _c("p", { class: "p1111" }, _v("aaa"))
+  );
+  */
 
   function _typeof(obj) {
     "@babel/helpers - typeof";
