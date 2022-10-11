@@ -4,6 +4,10 @@
   (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.Vue = factory());
 })(this, (function () { 'use strict';
 
+  /**
+   * generate 将ast生成render函数
+   *
+   */
   var defaultTagRE = /\{\{((?:.|\r?\n)+?)\}\}/g; // {{  }}
 
   function genProps(attrs) {
@@ -62,7 +66,7 @@
           tokens.push(JSON.stringify(text.slice(lastIndex)));
         }
 
-        return "_v(".concat(tokens.join('+'), ")");
+        return "_v(".concat(tokens.join("+"), ")");
       }
     }
   }
@@ -230,23 +234,11 @@
   function compileToFunction(template) {
     var root = parserHTML(template); // html===>ast（只能描述语法，语法不存在的无法描述）====>render函数======> 虚拟DOM=======>生成真实DOM
 
-    var code = generate(root);
-    console.log(root);
-    console.log(code);
-  }
-  /*
-  console.log(root);
-  {tag: 'div', type: 1, children: Array(3), parent: null, attrs: Array(3)}
+    var code = generate(root); //    render函数: new Function +with
 
-  console.log(code);
-  _c(
-    "div",
-    { id: "app", class: "div1", style: { width: "100px", " height": "100px" } },
-    _c("h3", { class: "title" }, _v("title")),
-    _v("{{name}}"),
-    _c("p", { class: "p1111" }, _v("aaa"))
-  );
-  */
+    var render = new Function("with(this){return ".concat(code, "}"));
+    return render;
+  }
 
   function _typeof(obj) {
     "@babel/helpers - typeof";
@@ -283,9 +275,159 @@
     return Constructor;
   }
 
+  // 依赖收集  每个属性都分配一个Dep  Dep可以用来存放watcher 反过来 watcher中也要存放dep
+  var id$1 = 0;
+  var Dep = /*#__PURE__*/function () {
+    function Dep() {
+      _classCallCheck(this, Dep);
+
+      this.id = id$1++;
+      this.subs = []; // 用来存放watcher
+    }
+
+    _createClass(Dep, [{
+      key: "depend",
+      value: function depend() {
+        // dep中要存放watcher  watcher中也要存放dep 多对多
+        if (Dep.target) {
+          // 将dep存放到watcher中
+          Dep.target.addDep(this);
+        }
+
+        console.log(this);
+      }
+    }, {
+      key: "addSub",
+      value: function addSub(watcher) {
+        // 将watcher存放到dep中
+        this.subs.push(watcher);
+      }
+    }, {
+      key: "notify",
+      value: function notify() {
+        this.subs.forEach(function (watcher) {
+          watcher.update();
+        });
+      }
+    }]);
+
+    return Dep;
+  }();
+  Dep.target = null;
+  function pushTarget(watcher) {
+    Dep.target = watcher;
+  }
+  function popTarget() {
+    Dep.target = null;
+  }
+
+  var id = 0;
+  var Watcher = /*#__PURE__*/function () {
+    function Watcher(vm, exprOrFn, cb, options) {
+      _classCallCheck(this, Watcher);
+
+      this.vm = vm;
+      this.exprOrFn = exprOrFn;
+      this.cb = cb;
+      this.options = options;
+      this.deps = [];
+      this.depsId = new Set(); // 默认让 exprOrFn执行  调用了render方法去vm上取值
+
+      this.getter = exprOrFn;
+      this.get();
+      this.id = id++; // 每个实例watcher唯一标识
+    } // 数据更新时， 调用get
+
+
+    _createClass(Watcher, [{
+      key: "get",
+      value: function get() {
+        // 当调用get会去vm上取值 会触发definedProperty.get
+        // 每个属性都可以收集自己的watcher---收集依赖dep
+        //一个属性对应多个watcher   一个watcher可以对应多个属性
+        pushTarget(this); // Dep.target = watcher
+
+        this.getter();
+        popTarget(); // Dep.target = null , 如果Dep.target有值 则说明这个变量在模板中被使用
+      }
+    }, {
+      key: "update",
+      value: function update() {
+        this.get();
+      }
+    }, {
+      key: "addDep",
+      value: function addDep(dep) {
+        if (!this.depsId.has(dep.id)) {
+          this.depsId.add(dep.id);
+          this.deps.push(dep);
+          dep.addSub(this);
+        }
+      }
+    }]);
+
+    return Watcher;
+  }();
+
+  function patch(oldVnode, vnode) {
+    if (oldVnode.nodeType == 1) {
+      var parentElm = oldVnode.parentNode;
+      var elm = createElm(vnode); // 根据虚拟节点创建真实DOM
+
+      parentElm.insertBefore(elm, oldVnode.nextSibling);
+      parentElm.removeChild(oldVnode);
+      return elm; // 第一次渲染后 删除了vm.$el 所以最后要返回新的elm
+    }
+  } // 核心方法 createElm方法  将虚拟DOM转换成真实DOM
+
+  function createElm(vnode) {
+    var tag = vnode.tag;
+        vnode.data;
+        var children = vnode.children,
+        text = vnode.text;
+        vnode.vm;
+
+    if (typeof tag == "string") {
+      // 元素
+      vnode.el = document.createElement(tag); // 虚拟节点vnode有一个el属性对应真实节点
+
+      children.forEach(function (child) {
+        vnode.el.appendChild(createElm(child));
+      });
+    } else {
+      // 文本
+      vnode.el = document.createTextNode(text);
+    }
+
+    return vnode.el;
+  }
+
+  function lifecycleMixin(Vue) {
+    Vue.prototype._update = function (vnode) {
+      // 既有初始化又有更新
+      var vm = this;
+      vm.$el = patch(vm.$el, vnode);
+    };
+  } // 后续每个组件渲染的时候，都会有一个watcher
+
+  function mountComponent(vm, el) {
+    // 更新函数 数据变化后会再次调用该方法
+    var updateComponent = function updateComponent() {
+      // 两个任务： 1 通过_render方法生成虚拟DOM  2 把虚拟DOM转成真实DOM
+      vm._update(vm._render());
+    }; // 观察者模式，属性是被观察者  观察者：刷新页面
+    // updateComponent();
+
+
+    new Watcher(vm, updateComponent, function () {
+      console.log("数据更新了");
+    }, true // 标识  它是一个渲染watcher，后续还有其它的watcher
+    );
+  }
+
   var oldArrayPrototype = Array.prototype;
   var arrayMethods = Object.create(oldArrayPrototype);
-  var methods = ['push', 'shift', 'pop', 'unshift', 'reverse', 'splice', 'sort'];
+  var methods = ["push", "shift", "pop", "unshift", "reverse", "splice", "sort"];
   methods.forEach(function (method) {
     arrayMethods[method] = function () {
       var _oldArrayPrototype$me;
@@ -299,16 +441,16 @@
       (_oldArrayPrototype$me = oldArrayPrototype[method]).call.apply(_oldArrayPrototype$me, [this].concat(args)); //  如果数组方法新添加的值是一个对象 则同样需要进行观测
 
 
-      var inserted; // 新添加的值  
+      var inserted; // 新添加的值
 
       switch (method) {
-        case 'push':
-        case 'unshift':
+        case "push":
+        case "unshift":
           inserted = args; // 类数组
 
           break;
 
-        case 'splice':
+        case "splice":
           inserted = args.slice(2);
           break;
       }
@@ -326,7 +468,7 @@
   }
 
   function observe(data) {
-    // vue2中会将所有的data数据进行数据劫持？什么是数据劫持？ Object.defineproperty 
+    // vue2中会将所有的data数据进行数据劫持？什么是数据劫持？ Object.defineproperty
     // 如果是对象才进行观测
     if (!isObject(data)) {
       return;
@@ -339,14 +481,14 @@
 
 
     return new Observer(data);
-  } // 检测数据的变化 
+  } // 检测数据的变化
 
   var Observer = /*#__PURE__*/function () {
     function Observer(data) {
       _classCallCheck(this, Observer);
 
       // 对对象中的所有属性进行劫持
-      // data.__ob__ = this;  将观测者实例挂载到观测的data数据上, 不能直接添加，会递归observe 
+      // data.__ob__ = this;  将观测者实例挂载到观测的data数据上, 不能直接添加，会递归observe
       Object.defineProperty(data, "__ob__", {
         value: this,
         enumerable: false
@@ -386,17 +528,28 @@
 
 
   function defineReactive(data, key, value) {
-    observe(value); // 如果对象属性的值为对象，则递归劫持对象属性 ，所以在使用Vue2的时候，尽量将数据扁平化不要过多嵌套  
+    observe(value); // 如果对象属性的值为对象，则递归劫持对象属性 ，所以在使用Vue2的时候，尽量将数据扁平化不要过多嵌套
+
+    var dep = new Dep(); // 每个属性都有一个dep
 
     Object.defineProperty(data, key, {
       get: function get() {
+        // 当调用属性时，希望将dep和watcher关联上
+        // 如果Dep.target有值 则此值是在模板中取值的
+        if (Dep.target) {
+          dep.depend(); // 将dep存放到watcher中
+        }
+
         return value;
       },
       set: function set(newValue) {
         // todo 用户更改了数据.....
-        observe(newValue); // 如果对象的某个属性重新赋的值也是一个对象，则也需要被劫持。
+        if (newValue !== value) {
+          observe(newValue); // 如果对象的某个属性重新赋的值也是一个对象，则也需要被劫持。
 
-        value = newValue;
+          value = newValue;
+          dep.notify(); // 告诉当前属性下存放的watcher执行更新
+        }
       }
     });
   }
@@ -462,7 +615,8 @@
     Vue.prototype.$mount = function (el) {
       var vm = this;
       var options = vm.$options;
-      el = document.querySelector(el); //  1 把模板转化成对应的渲染函数===> 虚拟DOM概念 vnode====> diff算法更新虚拟DOM====>产生真实节点 更新
+      el = document.querySelector(el);
+      vm.$el = el; //  1 把模板转化成对应的渲染函数===> 虚拟DOM概念 vnode====> diff算法更新虚拟DOM====>产生真实节点 更新
 
       if (!options.render) {
         var template = options.template;
@@ -470,11 +624,62 @@
         if (!template && el) {
           template = el.outerHTML;
           var render = compileToFunction(template);
-          options.render = render; // options.render函数就是渲染函数
+          options.render = render; // options.render函数就是渲染函数,接下来 调用render方法，渲染成真实DOM，替换掉页面内容
+          // 将组件vm实例挂载到el上---组件的挂载流程
+
+          mountComponent(vm);
         }
       }
     };
   }
+
+  function createElement(vm, tag) {
+    var data = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+
+    for (var _len = arguments.length, children = new Array(_len > 3 ? _len - 3 : 0), _key = 3; _key < _len; _key++) {
+      children[_key - 3] = arguments[_key];
+    }
+
+    return vnode(vm, tag, data, data.name, children, undefined);
+  }
+  function createTextElement(vm, text) {
+    return vnode(vm, undefined, undefined, undefined, undefined, text);
+  }
+
+  function vnode(vm, tag, data, key, children, text) {
+    return {
+      vm: vm,
+      tag: tag,
+      data: data,
+      key: key,
+      children: children,
+      text: text
+    };
+  }
+
+  function renderMixin(Vue) {
+    Vue.prototype._c = function () {
+      // createElement
+      return createElement.apply(void 0, [this].concat(Array.prototype.slice.call(arguments)));
+    };
+
+    Vue.prototype._v = function (text) {
+      // createTextElement
+      return createTextElement(this, text);
+    };
+
+    Vue.prototype._s = function (val) {
+      if (_typeof(val) == "object") return JSON.stringify(val);
+      return val;
+    };
+
+    Vue.prototype._render = function () {
+      var vm = this;
+      var render = vm.$options.render;
+      var vnode = render.call(vm);
+      return vnode;
+    };
+  } //  render.js 创建虚拟DOM
 
   function Vue(options) {
     this._init(options); // options vue实例的配置项{ el data methods等}
@@ -482,6 +687,10 @@
   }
 
   initMixin(Vue); // 此函数将_init方法添加到Vue原型上
+
+  renderMixin(Vue); // _render
+
+  lifecycleMixin(Vue); // _update
 
   return Vue;
 

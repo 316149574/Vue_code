@@ -13,12 +13,12 @@
    hello {{name}} world
    <p class="p1">{{message}}</p>
 </div>  
-
 <script>
     let vm = new Vue({
         el:"#app",
         data:{
             name:"xiaoming",
+            message:"hello",
             bookList:[
                 {title:"javascript", price:100},
                 {title:"css", price: 20},
@@ -26,6 +26,8 @@
             ]
         }
     });
+
+  
    
    //console.log(vm);
     // alert(vm.$options.data.name);

@@ -1,3 +1,7 @@
+/**
+ * generate 将ast生成render函数
+ *
+ */
 const defaultTagRE = /\{\{((?:.|\r?\n)+?)\}\}/g; // {{  }}
 function genProps(attrs) {
   // attrs  [{ name :id , value: app}, { name:XXX,value:XXX}]
@@ -28,21 +32,21 @@ function gen(el) {
       //有大括号情况 hello{{data}}world =====>  '_v("hello"+ data+ "world")'
       let match;
       let tokens = [];
-      let lastIndex=defaultTagRE.lastIndex = 0;
-      while (match = defaultTagRE.exec(text)) {
+      let lastIndex = (defaultTagRE.lastIndex = 0);
+      while ((match = defaultTagRE.exec(text))) {
         //hello{{data}}world
         let index = match.index;
         if (index > lastIndex) {
           // 说明捕获到了
           tokens.push(JSON.stringify(text.slice(lastIndex, index)));
         }
-         tokens.push( `_s(${ match[1].trim() })` );
-         lastIndex = index + match[0].length;
+        tokens.push(`_s(${match[1].trim()})`);
+        lastIndex = index + match[0].length;
       }
-      if(lastIndex<text.length){
-        tokens.push( JSON.stringify(text.slice(lastIndex)));
+      if (lastIndex < text.length) {
+        tokens.push(JSON.stringify(text.slice(lastIndex)));
       }
-      return `_v(${ tokens.join('+')})`
+      return `_v(${tokens.join("+")})`;
     }
   }
 }
