@@ -1,4 +1,5 @@
 import { popTarget, pushTarget } from "./dep";
+import { queueWatcher } from "./scheduler";
 let id = 0;
 export class Watcher {
   constructor(vm, exprOrFn, cb, options) {
@@ -23,6 +24,12 @@ export class Watcher {
     popTarget(); // Dep.target = null , 如果Dep.target有值 则说明这个变量在模板中被使用
   }
   update() {
+    // vue中的更新是异步的   多次调用update，先将watcher存放起来，等会一起更新
+    // this.get();
+    queueWatcher(this);
+    // 异步更新队列 https://v2.cn.vuejs.org/v2/guide/reactivity.html#%E5%BC%82%E6%AD%A5%E6%9B%B4%E6%96%B0%E9%98%9F%E5%88%97
+  }
+  run() {
     this.get();
   }
   addDep(dep) {
@@ -33,3 +40,14 @@ export class Watcher {
     }
   }
 }
+
+/**
+ * 思路：watcher和dep
+ * 1、我们将更新的功能封装成了一个watcher
+ * 2、渲染页面时，会将当前watcher放到 Dep.target上
+ * 3、在vue中页面渲染使用的属性，需要进行依赖收集，收集对象的渲染watcher
+ * 4、取值时，给每个属性都加上dep属性， 用于存放这个渲染watcher （同一个watcher会对应多个dep）
+ * 5、每个属性可能对应多个视图（多个视图可能是多个watcher），一个属性要对应多个watcher
+ * 6、dep.depend(); 通知dep存放watcher    Dep.target.addDep() 通知watcher存放dep
+ * 双向存储
+ * */

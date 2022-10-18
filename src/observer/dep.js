@@ -11,7 +11,6 @@ export class Dep {
       // 将dep存放到watcher中
       Dep.target.addDep(this);
     }
-    console.log(this);
   }
   addSub(watcher) {
     // 将watcher存放到dep中

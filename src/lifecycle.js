@@ -1,4 +1,5 @@
 import { Watcher } from "./observer/watcher";
+import { nextick } from "./utils";
 import { patch } from "./vdom/patch";
 
 // 生命周期文件
@@ -8,6 +9,7 @@ export function lifecycleMixin(Vue) {
     const vm = this;
     vm.$el = patch(vm.$el, vnode);
   };
+  Vue.prototype.$nextick = nextick;
 }
 
 // 后续每个组件渲染的时候，都会有一个watcher

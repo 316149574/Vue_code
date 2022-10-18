@@ -293,8 +293,6 @@
           // 将dep存放到watcher中
           Dep.target.addDep(this);
         }
-
-        console.log(this);
       }
     }, {
       key: "addSub",
@@ -320,6 +318,97 @@
   function popTarget() {
     Dep.target = null;
   }
+
+  function isfn(fn) {
+    return typeof fn === "function";
+  }
+  function isObject(obj) {
+    return _typeof(obj) == "object" && obj != null;
+  }
+  var callbacks = [];
+
+  function flushCallback() {
+    callbacks.forEach(function (cb) {
+      cb();
+    });
+    callbacks = [];
+    waiting = false;
+  }
+
+  function timer(flushCallback) {
+    var timerFn = function timerFn() {};
+
+    if (Promise) {
+      // 微任务
+      timerFn = function timerFn() {
+        Promise.resolve().then(flushCallback);
+      };
+    } else if (MutationObserver) {
+      // 微任务
+      var textNode = document.createTextNode(1);
+      var observe = new MutationObserver(flushCallback);
+      observe.observe(textNode, {
+        characterData: true
+      });
+
+      timerFn = function timerFn() {
+        textNode.textContent = 3;
+      };
+    } else if (setImmediate) {
+      timerFn = function timerFn() {
+        setImmediate(flushCallback);
+      };
+    } else {
+      timerFn = function timerFn() {
+        setTimeout(flushCallback, 0);
+      };
+    }
+
+    timerFn();
+  } // 内部先调用nextick ：flushSchedulerQueue
+  //用户后调nextick vm.$nextick(function(){console.log( vm.$el)});
+
+
+  var waiting = false;
+  function nextick(cb) {
+    callbacks.push(cb);
+
+    if (!waiting) {
+      timer(flushCallback);
+      waiting = true;
+    }
+  }
+
+  var queue = []; // 存放更新视图的watcher 去重
+
+  var has = {};
+
+  function flushSchedulerQueue() {
+    for (var i = 0; i < queue.length; i++) {
+      queue[i].run();
+    }
+
+    queue = [];
+    has = {};
+    pending = false;
+  }
+
+  var pending = false;
+  function queueWatcher(watcher) {
+    var id = watcher.id;
+
+    if (has[id] == null) {
+      queue.push(watcher);
+      has[id] = true; // 开启一次更新操作， 批处理 （防抖）
+
+      if (!pending) {
+        nextick(flushSchedulerQueue); // 等待所有同步执行完，再执行更新操作
+
+        pending = true;
+      }
+    }
+  } // 同步代码执行完后。执行栈中先执行微任务（），在执行宏任务，当同步数据更改后，我们希望尽快更新视图
+  // 定时器是宏任务，所以考虑使用promise微任务 vue内部封装了一个nextick方法使用promise
 
   var id = 0;
   var Watcher = /*#__PURE__*/function () {
@@ -353,6 +442,13 @@
     }, {
       key: "update",
       value: function update() {
+        // vue中的更新是异步的   多次调用update，先将watcher存放起来，等会一起更新
+        // this.get();
+        queueWatcher(this); // 异步更新队列 https://v2.cn.vuejs.org/v2/guide/reactivity.html#%E5%BC%82%E6%AD%A5%E6%9B%B4%E6%96%B0%E9%98%9F%E5%88%97
+      }
+    }, {
+      key: "run",
+      value: function run() {
         this.get();
       }
     }, {
@@ -368,6 +464,16 @@
 
     return Watcher;
   }();
+  /**
+   * 思路：watcher和dep
+   * 1、我们将更新的功能封装成了一个watcher
+   * 2、渲染页面时，会将当前watcher放到 Dep.target上
+   * 3、在vue中页面渲染使用的属性，需要进行依赖收集，收集对象的渲染watcher
+   * 4、取值时，给每个属性都加上dep属性， 用于存放这个渲染watcher （同一个watcher会对应多个dep）
+   * 5、每个属性可能对应多个视图（多个视图可能是多个watcher），一个属性要对应多个watcher
+   * 6、dep.depend(); 通知dep存放watcher    Dep.target.addDep() 通知watcher存放dep
+   * 双向存储
+   * */
 
   function patch(oldVnode, vnode) {
     if (oldVnode.nodeType == 1) {
@@ -408,6 +514,8 @@
       var vm = this;
       vm.$el = patch(vm.$el, vnode);
     };
+
+    Vue.prototype.$nextick = nextick;
   } // 后续每个组件渲染的时候，都会有一个watcher
 
   function mountComponent(vm, el) {
@@ -459,13 +567,6 @@
       if (inserted) ob.observeArray(inserted); //  todo 更新操作
     };
   }); //  Object.create(); 方法第一个参数为某对象的原型 本质是新创建的对象继承传入参数对象的原型
-
-  function isfn(fn) {
-    return typeof fn === "function";
-  }
-  function isObject(obj) {
-    return _typeof(obj) == 'object' && obj != null;
-  }
 
   function observe(data) {
     // vue2中会将所有的data数据进行数据劫持？什么是数据劫持？ Object.defineproperty
