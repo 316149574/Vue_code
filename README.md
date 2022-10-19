@@ -6,4 +6,9 @@
 npm install rollup @babel/core  @babel/preset-env  rollup-plugin-babel -D
 ```
 ### 数据data劫持
-- 
+- vue中data数据尽量扁平化，避免递归
+- vue中data中数组通过方法劫持更新视图
+  
+### vue视图更新为异步更新   
+如果需要获取更新后的DOM， 使用 $nextick(callback)
+
