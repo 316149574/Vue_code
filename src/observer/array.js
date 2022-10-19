@@ -7,7 +7,6 @@ methods.forEach((method) => {
     // args参数列表  arr.push(1,2,3)  ...args = [1,2,3]
     // 方法劫持 搞事情....
     oldArrayPrototype[method].call(this, ...args);
-
     //  如果数组方法新添加的值是一个对象 则同样需要进行观测
     let inserted; // 新添加的值
     switch (method) {
@@ -21,6 +20,7 @@ methods.forEach((method) => {
     }
     let ob = this.__ob__;
     if (inserted) ob.observeArray(inserted);
+    ob.dep.notify();
     //  todo 更新操作
   };
 });

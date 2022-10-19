@@ -7,7 +7,6 @@ export function isObject(obj) {
 }
 
 let callbacks = [];
-
 function flushCallback() {
   callbacks.forEach((cb) => {
     cb();
