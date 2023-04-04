@@ -43,6 +43,8 @@ function timer(flushCallback) {
 
 // 内部先调用nextick ：flushSchedulerQueue
 //用户后调nextick vm.$nextick(function(){console.log( vm.$el)});
+
+// 内部和用户各一共调用2次nextTick，其实更新视图逻辑只需执行一次  防抖处理
 let waiting = false;
 export function nextick(cb) {
   callbacks.push(cb);

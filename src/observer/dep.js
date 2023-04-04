@@ -5,29 +5,28 @@ export class Dep {
     this.id = id++;
     this.subs = []; // 用来存放watcher
   }
+  // 将dep存放到watcher中
+  // dep中要存放watcher  watcher中也要存放dep 多对多
   depend() {
-    // dep中要存放watcher  watcher中也要存放dep 多对多
     if (Dep.target) {
-      // 将dep存放到watcher中
       Dep.target.addDep(this);
     }
   }
+  // 将watcher存放到dep中
   addSub(watcher) {
-    // 将watcher存放到dep中
     this.subs.push(watcher);
   }
+  //  通知所有watcher更新视图
   notify() {
     this.subs.forEach((watcher) => {
       watcher.update();
     });
   }
 }
-
 Dep.target = null;
 export function pushTarget(watcher) {
   Dep.target = watcher;
 }
-
 export function popTarget() {
   Dep.target = null;
 }

@@ -13,14 +13,13 @@ export function observe(data) {
   }
   return new Observer(data); // 进行观测  默认最外层的data必须是一个对象
 }
-
 // 如果给对象新增一个属性，不会触发视图更新（给对象本身也增加一个dep（dep中存watcher）， 增加一个属性后，手动触发watcher更新）
 class Observer {
   // 检测数据的变化
   constructor(data) {
     // 对对象中的所有属性进行劫持
     // data.__ob__ = this;  将观测者实例挂载到观测的data数据上, 不能直接添加，会递归observe
-    this.dep = new Dep(); // arr._ob_.dep    数据可能是对象 也可能是数组
+    this.dep = new Dep(); // arr._ob_.dep    数据可能是对象 也可能是数组  数组怎么收集依赖？  在页面 {{ arr}} 会触发 obj={ arr:[1,2,3]} obj的get
     Object.defineProperty(data, "__ob__", {
       value: this,
       enumerable: false,
@@ -64,8 +63,8 @@ function defineReactive(data, key, value) {
       // 当调用属性时，希望将dep和watcher关联上
       // 如果Dep.target有值 则此值是在模板中取值的
       if (Dep.target) {
-        dep.depend(); // 将dep存放到watcher中
-        if (childOb) childOb.dep.depend();
+        dep.depend();
+        if (childOb) childOb.dep.depend(); // childOb可能是数组 也可能是对象  是对象后续开发$set时 会也会让对象更新视图
         if (Array.isArray(value)) {
           dependArray(value);
         }
@@ -77,7 +76,7 @@ function defineReactive(data, key, value) {
       if (newValue !== value) {
         observe(newValue); // 如果对象的某个属性重新赋的值也是一个对象，则也需要被劫持。
         value = newValue;
-        dep.notify(); // 告诉当前属性下存放的watcher执行更新
+        dep.notify(); // 告诉当前属性的Dep存放的watcher执行更新
       }
     },
   });

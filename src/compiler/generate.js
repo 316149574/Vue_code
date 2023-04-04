@@ -63,5 +63,12 @@ export function generate(el) {
   let code = `_c(  "${el.tag}", ${
     el.attrs.length ? genProps(el.attrs) : "undefined"
   } ${children ? `,${children}` : " "}  )`;
+
   return code;
 }
+
+/*
+
+_c(  "div", { id : "app",class : "div1",style : {"width":"100px"," height":"100px"}} ,_v("hello"+_s(name)+"world"),_c(  "p", { class : "p1"} ,_v(_s(message))  ),_v(_s(bookList))  )
+
+*/
