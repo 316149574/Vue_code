@@ -88,6 +88,11 @@
     var code = "_c(  \"".concat(el.tag, "\", ").concat(el.attrs.length ? genProps(el.attrs) : "undefined", " ").concat(children ? ",".concat(children) : " ", "  )");
     return code;
   }
+  /*
+
+  _c(  "div", { id : "app",class : "div1",style : {"width":"100px"," height":"100px"}} ,_v("hello"+_s(name)+"world"),_c(  "p", { class : "p1"} ,_v(_s(message))  ),_v(_s(bookList))  )
+
+  */
 
   var ncname = "[a-zA-Z_][\\-\\.0-9_a-zA-Z]*"; // 标签名
 
@@ -283,23 +288,24 @@
 
       this.id = id$1++;
       this.subs = []; // 用来存放watcher
-    }
+    } // 将dep存放到watcher中
+    // dep中要存放watcher  watcher中也要存放dep 多对多
+
 
     _createClass(Dep, [{
       key: "depend",
       value: function depend() {
-        // dep中要存放watcher  watcher中也要存放dep 多对多
         if (Dep.target) {
-          // 将dep存放到watcher中
           Dep.target.addDep(this);
         }
-      }
+      } // 将watcher存放到dep中
+
     }, {
       key: "addSub",
       value: function addSub(watcher) {
-        // 将watcher存放到dep中
         this.subs.push(watcher);
-      }
+      } //  通知所有watcher更新视图
+
     }, {
       key: "notify",
       value: function notify() {
@@ -367,6 +373,7 @@
     timerFn();
   } // 内部先调用nextick ：flushSchedulerQueue
   //用户后调nextick vm.$nextick(function(){console.log( vm.$el)});
+  // 内部和用户各一共调用2次nextTick，其实更新视图逻辑只需执行一次  防抖处理
 
 
   var waiting = false;
@@ -407,7 +414,7 @@
         pending = true;
       }
     }
-  } // 同步代码执行完后。执行栈中先执行微任务（），在执行宏任务，当同步数据更改后，我们希望尽快更新视图
+  } // 同步代码执行完后。执行栈中先执行微任务（），在执行宏任务，当同步数据更改后，我们希望尽快更新视图 所以使用微任务
   // 定时器是宏任务，所以考虑使用promise微任务 vue内部封装了一个nextick方法使用promise
 
   var id = 0;
@@ -419,11 +426,31 @@
       this.exprOrFn = exprOrFn;
       this.cb = cb;
       this.options = options;
-      this.deps = [];
-      this.depsId = new Set(); // 默认让 exprOrFn执行  调用了render方法去vm上取值
+      this.user = !!options.user; // 是否是用户watcher  watch
 
-      this.getter = exprOrFn;
-      this.get();
+      this.deps = []; // 存放dep
+
+      this.depsId = new Set(); // 不论是渲染还是watch监听的watcher， this.getter方法的作用都是取值操作，触发属性的get进行依赖收集
+
+      if (typeof exprOrFn === "string") {
+        this.getter = function () {
+          // 当取值时，就会进行依赖📱
+          var path = exprOrFn.split("."); // 'person.name' ==> [person, name]
+
+          var obj = vm;
+
+          for (var i = 0; i < path.length; i++) {
+            obj = obj[path[i]];
+          }
+
+          return obj;
+        };
+      } else {
+        // 默认让 exprOrFn执行  调用了render方法去vm上取值
+        this.getter = exprOrFn;
+      }
+
+      this.value = this.get();
       this.id = id++; // 每个实例watcher唯一标识
     } // 数据更新时， 调用get
 
@@ -436,8 +463,10 @@
         //一个属性对应多个watcher   一个watcher可以对应多个属性
         pushTarget(this); // Dep.target = watcher
 
-        this.getter();
+        var value = this.getter();
         popTarget(); // Dep.target = null , 如果Dep.target有值 则说明这个变量在模板中被使用
+
+        return value;
       }
     }, {
       key: "update",
@@ -449,7 +478,14 @@
     }, {
       key: "run",
       value: function run() {
-        this.get();
+        var newValue = this.get();
+        var oldValue = this.value;
+        this.value = newValue;
+
+        if (this.user) {
+          // 必须是用户watcher才调用
+          this.cb.call(this.vm, oldValue, newValue);
+        }
       }
     }, {
       key: "addDep",
@@ -473,6 +509,12 @@
    * 5、每个属性可能对应多个视图（多个视图可能是多个watcher），一个属性要对应多个watcher
    * 6、dep.depend(); 通知dep存放watcher    Dep.target.addDep() 通知watcher存放dep
    * 双向存储
+   *
+   *
+   *
+   * 每个属性分配一个watcher(使用pushTarget方法 将wather放到Dep的target属性上 )用于收集哪些组件依赖于此属性，
+   * 当数据发生改变时，让属性Dep中所收集的watcher更新对应的组件视图
+   *
    * */
 
   function patch(oldVnode, vnode) {
@@ -590,7 +632,7 @@
 
       // 对对象中的所有属性进行劫持
       // data.__ob__ = this;  将观测者实例挂载到观测的data数据上, 不能直接添加，会递归observe
-      this.dep = new Dep(); // arr._ob_.dep    数据可能是对象 也可能是数组
+      this.dep = new Dep(); // arr._ob_.dep    数据可能是对象 也可能是数组  数组怎么收集依赖？  在页面 {{ arr}} 会触发 obj={ arr:[1,2,3]} obj的get
 
       Object.defineProperty(data, "__ob__", {
         value: this,
@@ -648,9 +690,8 @@
         // 当调用属性时，希望将dep和watcher关联上
         // 如果Dep.target有值 则此值是在模板中取值的
         if (Dep.target) {
-          dep.depend(); // 将dep存放到watcher中
-
-          if (childOb) childOb.dep.depend();
+          dep.depend();
+          if (childOb) childOb.dep.depend(); // childOb可能是数组 也可能是对象  是对象后续开发$set时 会也会让对象更新视图
 
           if (Array.isArray(value)) {
             dependArray(value);
@@ -665,7 +706,7 @@
           observe(newValue); // 如果对象的某个属性重新赋的值也是一个对象，则也需要被劫持。
 
           value = newValue;
-          dep.notify(); // 告诉当前属性下存放的watcher执行更新
+          dep.notify(); // 告诉当前属性的Dep存放的watcher执行更新
         }
       }
     });
@@ -676,18 +717,35 @@
            如果是数组 会劫持数组的方法，并对数组中不是基本数据类型的数据进行检测 
    * */
 
+  function stateMixin(Vue) {
+    Vue.prototype.$watch = function (key, handler) {
+      var options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+      options.user = true; // 表示这是用户自己写的watcher  非渲染watcher
+
+      new Watcher(this, key, handler, options);
+    };
+  } // 数据状态初始化
+
   function initState(vm) {
     var opts = vm.$options;
 
     if (opts.data) {
       initData(vm);
     }
+
+    if (opts.watch) {
+      initWatch(vm, opts.watch);
+    }
+
+    if (opts.computed) {
+      initComputed(vm, opts.computed);
+    }
   }
 
   function initData(vm) {
     var data = vm.$options.data; // 此时data和vm没有任何关系  data = isfn(data) ? data.call(vm) : data;  解决：
 
-    data = vm._data = isfn(data) ? data.call(vm) : data; // 判断data是函数还是json对象 
+    data = vm._data = isfn(data) ? data.call(vm) : data; // 判断data是函数还是json对象
     // vm.name ----> vm._data.name
 
     for (var key in data) {
@@ -695,6 +753,39 @@
     }
 
     observe(data);
+  }
+
+  function initWatch(vm, watch) {
+    for (var key in watch) {
+      var handler = watch[key];
+
+      if (Array.isArray(handler)) {
+        for (var i = 0; i < handler.length; i++) {
+          createWatcher(vm, key, handler[i]);
+        }
+      } else {
+        createWatcher(vm, key, handler);
+      }
+    }
+  }
+
+  function createWatcher(vm, key, handler) {
+    return vm.$watch(key, handler);
+  }
+
+  function initComputed(vm, computed) {
+    for (var key in computed) {
+      var userDef = computed[key]; // 可能是对象，也可能是函数
+
+      var getter = typeof userDef == "function" ? userDef : userDef.get; // 有多少个getter就创建多少个watcher ， 每个计算属性的本质就是watcher
+
+      new Watcher(vm, getter, function () {}, {
+        lazy: true
+      }); // lazy:true 让其不马上执行， 只有当计算属性被调用后才执行
+      // 将key定义在vm的_data上   vm_data.fullname  计算属性的本质也是使用 Object.defineProperty
+
+      defineComputed(vm, key, userDef);
+    }
   } // 数据代理  当调用vm.name 则在 vm._data.name获取
 
 
@@ -801,6 +892,8 @@
   renderMixin(Vue); // _render
 
   lifecycleMixin(Vue); // _update
+
+  stateMixin(Vue);
 
   return Vue;
 

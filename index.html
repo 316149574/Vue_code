@@ -1,36 +1,70 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
     <script src="./dist/vue.js"></script>
+  </head>
 
-</head>
+  <body>
+    <div id="app">{{ bookList }} {{ name}}</div>
 
-<body>
-    <div id="app" class="div1" style="width:100px; height:100px;">
-        hello {{name}} world
-        <p class="p1">{{message}}</p>
-        {{ bookList }}
-    </div>
     <script>
-        let vm = new Vue({
-            el: "#app",
-            data: {
-                name: "xiaoming",
-                message: "hello",
-                bookList: [1, 2, 3]
-            }
-        });
+      let vm = new Vue({
+        el: "#app",
+        data: {
+          bookList: [1, 2, 3],
+          name: "javasript",
+          name2: "html",
+          name3: { n: 1 },
+          firstname: "duan",
+          lastname: "li",
+        },
+        computed: {
+          fullname() {
+            return firstname + lastname;
+          },
+          totleprice: {
+            get() {},
+            set() {},
+          },
+        },
+        watch: {
+          name(oldV, newV) {
+            // document.body.style.background = "red";
+          },
+          name2: [
+            function () {
+              console.log(1);
+            },
+            function () {
+              console.log(2);
+            },
+          ],
+          name3: {
+            function() {},
+          },
+        },
+      });
 
-   //console.log(vm);
-    // alert(vm.$options.data.name);
-    // vm.$options.data.name = "jiangjing"
+      // vm.$watch('name', function(){})
 
+      //  console.log(vm.bookList);
+      // vm.name = "小名";
+      //   vm.bookList.push("a");
+
+      //   vm.$nextick(() => {
+      //     console.log(vm.$el);
+      //   });
     </script>
-</body>
-
+  </body>
 </html>
+
+<!-- 
+   vue特点总结：
+   1、vue中的data数据尽量扁平化，否则会有大量递归
+   2、对象是同多 defindeProperty  如果不存在的属性不会拦截也不会有响应 ， 可以使用$set 让对象自己去notify 或者赋一个新对象
+   3、vue中的数据  改索引和length不会更新视图   通过方法拦截更新视图  数据中如果是对象，修改时也可以更新视图
+ -->
