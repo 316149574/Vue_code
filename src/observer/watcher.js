@@ -7,13 +7,15 @@ export class Watcher {
     this.exprOrFn = exprOrFn;
     this.cb = cb;
     this.options = options;
+    this.lazy = !!options.lazy;
+    this.dirty = options.lazy; //如果是计算属性 默认值lazy为true  dirty也为true
     this.user = !!options.user; // 是否是用户watcher  watch
     this.deps = []; // 存放dep
     this.depsId = new Set();
     // 不论是渲染还是watch监听的watcher， this.getter方法的作用都是取值操作，触发属性的get进行依赖收集
     if (typeof exprOrFn === "string") {
       this.getter = function () {
-        // 当取值时，就会进行依赖📱
+        // 当取值时，就会进行依赖收集
         let path = exprOrFn.split("."); // 'person.name' ==> [person, name]
         let obj = vm;
         for (let i = 0; i < path.length; i++) {
@@ -25,8 +27,7 @@ export class Watcher {
       // 默认让 exprOrFn执行  调用了render方法去vm上取值
       this.getter = exprOrFn;
     }
-
-    this.value = this.get();
+    this.value = this.lazy ? undefined : this.get();
     this.id = id++; // 每个实例watcher唯一标识
   }
   // 数据更新时， 调用get
@@ -35,13 +36,16 @@ export class Watcher {
     // 每个属性都可以收集自己的watcher---收集依赖dep
     //一个属性对应多个watcher   一个watcher可以对应多个属性
     pushTarget(this); // Dep.target = watcher
-    const value = this.getter();
+    const value = this.getter.call(this.vm);
     popTarget(); // Dep.target = null , 如果Dep.target有值 则说明这个变量在模板中被使用
     return value;
   }
   update() {
     // vue中的更新是异步的   多次调用update，先将watcher存放起来，等会一起更新
     // this.get();
+    if (this.lazy) {
+      this.dirty = true;
+    }
     queueWatcher(this);
     // 异步更新队列 https://v2.cn.vuejs.org/v2/guide/reactivity.html#%E5%BC%82%E6%AD%A5%E6%9B%B4%E6%96%B0%E9%98%9F%E5%88%97
   }
@@ -59,6 +63,16 @@ export class Watcher {
       this.depsId.add(dep.id);
       this.deps.push(dep);
       dep.addSub(this);
+    }
+  }
+  evaluate() {
+    this.dirty = false; // 为false 表示去过值了
+    this.value = this.get();
+  }
+  depend() {
+    let i = this.deps.length;
+    while (i--) {
+      this.deps[i].depend(); // 让lastname 和firtname收集渲染watcher
     }
   }
 }

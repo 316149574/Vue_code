@@ -185,11 +185,11 @@
     return root;
   }
   var root = null;
-  var stack = []; // 用于存放解析标签   >>>>栈 先进后出
+  var stack$1 = []; // 用于存放解析标签   >>>>栈 先进后出
   //  匹配到一个节点： 标记节点的父亲是谁 ，父亲的儿子是当次匹配的节点 （双向标记）
 
   function start(tagName, attributes) {
-    var parent = stack[stack.length - 1];
+    var parent = stack$1[stack$1.length - 1];
     var element = createAstElement(tagName, attributes);
 
     if (!root) {
@@ -202,14 +202,14 @@
       parent.children.push(element); // 记录父亲的儿子
     }
 
-    stack.push(element);
+    stack$1.push(element);
   }
 
   function chars(text) {
     text = text.replace(/\s+/g, "");
 
     if (text) {
-      var parent = stack[stack.length - 1];
+      var parent = stack$1[stack$1.length - 1];
       parent.children.push({
         type: 3,
         text: text
@@ -218,7 +218,7 @@
   }
 
   function end(tagName) {
-    var last = stack.pop();
+    var last = stack$1.pop();
 
     if (last.tag != tagName) {
       throw new Error("标签格式有误");
@@ -318,11 +318,14 @@
     return Dep;
   }();
   Dep.target = null;
+  var stack = [];
   function pushTarget(watcher) {
     Dep.target = watcher;
+    stack.push(watcher);
   }
   function popTarget() {
-    Dep.target = null;
+    stack.pop();
+    Dep.target = stack[stack.length - 1];
   }
 
   function isfn(fn) {
@@ -426,6 +429,9 @@
       this.exprOrFn = exprOrFn;
       this.cb = cb;
       this.options = options;
+      this.lazy = !!options.lazy;
+      this.dirty = options.lazy; //如果是计算属性 默认值lazy为true  dirty也为true
+
       this.user = !!options.user; // 是否是用户watcher  watch
 
       this.deps = []; // 存放dep
@@ -434,7 +440,7 @@
 
       if (typeof exprOrFn === "string") {
         this.getter = function () {
-          // 当取值时，就会进行依赖📱
+          // 当取值时，就会进行依赖收集
           var path = exprOrFn.split("."); // 'person.name' ==> [person, name]
 
           var obj = vm;
@@ -450,7 +456,7 @@
         this.getter = exprOrFn;
       }
 
-      this.value = this.get();
+      this.value = this.lazy ? undefined : this.get();
       this.id = id++; // 每个实例watcher唯一标识
     } // 数据更新时， 调用get
 
@@ -463,7 +469,7 @@
         //一个属性对应多个watcher   一个watcher可以对应多个属性
         pushTarget(this); // Dep.target = watcher
 
-        var value = this.getter();
+        var value = this.getter.call(this.vm);
         popTarget(); // Dep.target = null , 如果Dep.target有值 则说明这个变量在模板中被使用
 
         return value;
@@ -473,6 +479,10 @@
       value: function update() {
         // vue中的更新是异步的   多次调用update，先将watcher存放起来，等会一起更新
         // this.get();
+        if (this.lazy) {
+          this.dirty = true;
+        }
+
         queueWatcher(this); // 异步更新队列 https://v2.cn.vuejs.org/v2/guide/reactivity.html#%E5%BC%82%E6%AD%A5%E6%9B%B4%E6%96%B0%E9%98%9F%E5%88%97
       }
     }, {
@@ -494,6 +504,22 @@
           this.depsId.add(dep.id);
           this.deps.push(dep);
           dep.addSub(this);
+        }
+      }
+    }, {
+      key: "evaluate",
+      value: function evaluate() {
+        this.dirty = false; // 为false 表示去过值了
+
+        this.value = this.get();
+      }
+    }, {
+      key: "depend",
+      value: function depend() {
+        var i = this.deps.length;
+
+        while (i--) {
+          this.deps[i].depend(); // 让lastname 和firtname收集渲染watcher
         }
       }
     }]);
@@ -774,18 +800,53 @@
   }
 
   function initComputed(vm, computed) {
+    var watchers = vm._computedWatchers = {};
+
     for (var key in computed) {
       var userDef = computed[key]; // 可能是对象，也可能是函数
 
       var getter = typeof userDef == "function" ? userDef : userDef.get; // 有多少个getter就创建多少个watcher ， 每个计算属性的本质就是watcher
+      // 将创建的watcher存放到vm上
 
-      new Watcher(vm, getter, function () {}, {
+      watchers[key] = new Watcher(vm, getter, function () {}, {
         lazy: true
       }); // lazy:true 让其不马上执行， 只有当计算属性被调用后才执行
       // 将key定义在vm的_data上   vm_data.fullname  计算属性的本质也是使用 Object.defineProperty
 
       defineComputed(vm, key, userDef);
     }
+  }
+
+  function defineComputed(vm, key, userDef) {
+    var sharedProperty = {};
+
+    if (typeof userDef == "function") {
+      sharedProperty.get = createComputedGetter(key);
+    } else {
+      sharedProperty.get = createComputedGetter(key); // 每次取值 不要直接走get，判断其watcher中dirty是否是脏的  是脏的才更新
+
+      sharedProperty.set = userDef.set;
+    }
+
+    Object.defineProperty(vm, key, sharedProperty);
+  }
+
+  function createComputedGetter(key) {
+    // 取计算属性的值，走此函数
+    return function computedGetter() {
+      var watcher = this._computedWatchers[key];
+
+      if (watcher.dirty) {
+        watcher.evaluate(); // 求值函数  其实就是调getter  fullname() {return this.firstname + this.lastname;}  调get会取fristname 和 lasename 此时会讲wacther存放到依赖属性的dep种
+      } // 如果当前Dep上还有值， 则应继续向上收集（渲染watcher）
+
+
+      if (Dep.target) {
+        watcher.depend(); // watcher里面有多个dep
+      }
+
+      return watcher.value; // 计算属性的缓存  其实是把值缓存到watcher.value上
+    };
   } // 数据代理  当调用vm.name 则在 vm._data.name获取
 
 

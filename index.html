@@ -9,7 +9,10 @@
   </head>
 
   <body>
-    <div id="app">{{ bookList }} {{ name}}</div>
+    <!--  在页面直接写fullname时 ， fullname不会收集渲染watcher （和其它属性不是同一个get）， 因为fullname没有dep，没有收集功能 -->
+    <!-- this.firstname 和this.lastname 执行get会取值进行依赖收集  是在计算属性中使用的，所以它会收集计算属性watcher -->
+    <!-- this.firstname 和this.lastname 应该收集计算watcher和渲染watcher -->
+    <div id="app">{{fullname}}</div>
 
     <script>
       let vm = new Vue({
@@ -24,7 +27,7 @@
         },
         computed: {
           fullname() {
-            return firstname + lastname;
+            return this.firstname + this.lastname;
           },
           totleprice: {
             get() {},
