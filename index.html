@@ -12,55 +12,35 @@
     <!--  在页面直接写fullname时 ， fullname不会收集渲染watcher （和其它属性不是同一个get）， 因为fullname没有dep，没有收集功能 -->
     <!-- this.firstname 和this.lastname 执行get会取值进行依赖收集  是在计算属性中使用的，所以它会收集计算属性watcher -->
     <!-- this.firstname 和this.lastname 应该收集计算watcher和渲染watcher -->
-    <div id="app">{{fullname}}</div>
+    <div id="app"></div>
 
     <script>
-      let vm = new Vue({
-        el: "#app",
-        data: {
-          bookList: [1, 2, 3],
-          name: "javasript",
-          name2: "html",
-          name3: { n: 1 },
-          firstname: "duan",
-          lastname: "li",
-        },
-        computed: {
-          fullname() {
-            return this.firstname + this.lastname;
-          },
-          totleprice: {
-            get() {},
-            set() {},
-          },
-        },
-        watch: {
-          name(oldV, newV) {
-            // document.body.style.background = "red";
-          },
-          name2: [
-            function () {
-              console.log(1);
-            },
-            function () {
-              console.log(2);
-            },
-          ],
-          name3: {
-            function() {},
-          },
-        },
-      });
+        Vue.mixin({
+          beforeCreate(){
+             console.log(1);
+          }
+        })
 
-      // vm.$watch('name', function(){})
-
-      //  console.log(vm.bookList);
-      // vm.name = "小名";
-      //   vm.bookList.push("a");
-
-      //   vm.$nextick(() => {
-      //     console.log(vm.$el);
-      //   });
+        Vue.mixin({
+          beforeCreate(){
+            console.log(2);
+          }
+        })
+        const vm = new Vue({
+           el:"#app",
+           beforeCreate(){
+             console.log("状态初始化前");
+           },
+           created(){
+             console.log("状态初始化完成")
+           },
+           beforeMount(){
+             console.log("数据挂载前")
+           }
+        })
+        
+     
+     
     </script>
   </body>
 </html>

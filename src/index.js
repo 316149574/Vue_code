@@ -1,3 +1,4 @@
+import { initGlobalApi } from "./global-api/index.js";
 import { initMixin } from "./init";
 import { lifecycleMixin } from "./lifecycle";
 import { renderMixin } from "./render";
@@ -10,4 +11,7 @@ initMixin(Vue); // 此函数将_init方法添加到Vue原型上
 renderMixin(Vue); // _render
 lifecycleMixin(Vue); // _update
 stateMixin(Vue);
+
+// 在类上扩展
+initGlobalApi(Vue) 
 export default Vue;

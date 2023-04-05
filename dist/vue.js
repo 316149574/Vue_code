@@ -4,6 +4,221 @@
   (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.Vue = factory());
 })(this, (function () { 'use strict';
 
+  function ownKeys(object, enumerableOnly) {
+    var keys = Object.keys(object);
+
+    if (Object.getOwnPropertySymbols) {
+      var symbols = Object.getOwnPropertySymbols(object);
+      enumerableOnly && (symbols = symbols.filter(function (sym) {
+        return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+      })), keys.push.apply(keys, symbols);
+    }
+
+    return keys;
+  }
+
+  function _objectSpread2(target) {
+    for (var i = 1; i < arguments.length; i++) {
+      var source = null != arguments[i] ? arguments[i] : {};
+      i % 2 ? ownKeys(Object(source), !0).forEach(function (key) {
+        _defineProperty(target, key, source[key]);
+      }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)) : ownKeys(Object(source)).forEach(function (key) {
+        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
+      });
+    }
+
+    return target;
+  }
+
+  function _typeof(obj) {
+    "@babel/helpers - typeof";
+
+    return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (obj) {
+      return typeof obj;
+    } : function (obj) {
+      return obj && "function" == typeof Symbol && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
+    }, _typeof(obj);
+  }
+
+  function _classCallCheck(instance, Constructor) {
+    if (!(instance instanceof Constructor)) {
+      throw new TypeError("Cannot call a class as a function");
+    }
+  }
+
+  function _defineProperties(target, props) {
+    for (var i = 0; i < props.length; i++) {
+      var descriptor = props[i];
+      descriptor.enumerable = descriptor.enumerable || false;
+      descriptor.configurable = true;
+      if ("value" in descriptor) descriptor.writable = true;
+      Object.defineProperty(target, descriptor.key, descriptor);
+    }
+  }
+
+  function _createClass(Constructor, protoProps, staticProps) {
+    if (protoProps) _defineProperties(Constructor.prototype, protoProps);
+    if (staticProps) _defineProperties(Constructor, staticProps);
+    Object.defineProperty(Constructor, "prototype", {
+      writable: false
+    });
+    return Constructor;
+  }
+
+  function _defineProperty(obj, key, value) {
+    if (key in obj) {
+      Object.defineProperty(obj, key, {
+        value: value,
+        enumerable: true,
+        configurable: true,
+        writable: true
+      });
+    } else {
+      obj[key] = value;
+    }
+
+    return obj;
+  }
+
+  function isfn(fn) {
+    return typeof fn === "function";
+  }
+  function isObject(obj) {
+    return _typeof(obj) == "object" && obj != null;
+  }
+  var callbacks = [];
+
+  function flushCallback() {
+    callbacks.forEach(function (cb) {
+      cb();
+    });
+    callbacks = [];
+    waiting = false;
+  }
+
+  function timer(flushCallback) {
+    var timerFn = function timerFn() {};
+
+    if (Promise) {
+      // 微任务
+      timerFn = function timerFn() {
+        Promise.resolve().then(flushCallback);
+      };
+    } else if (MutationObserver) {
+      // 微任务
+      var textNode = document.createTextNode(1);
+      var observe = new MutationObserver(flushCallback);
+      observe.observe(textNode, {
+        characterData: true
+      });
+
+      timerFn = function timerFn() {
+        textNode.textContent = 3;
+      };
+    } else if (setImmediate) {
+      timerFn = function timerFn() {
+        setImmediate(flushCallback);
+      };
+    } else {
+      timerFn = function timerFn() {
+        setTimeout(flushCallback, 0);
+      };
+    }
+
+    timerFn();
+  } // 内部先调用nextick ：flushSchedulerQueue
+  //用户后调nextick vm.$nextick(function(){console.log( vm.$el)});
+  // 内部和用户各一共调用2次nextTick，其实更新视图逻辑只需执行一次  防抖处理
+
+
+  var waiting = false;
+  function nextick(cb) {
+    callbacks.push(cb);
+
+    if (!waiting) {
+      timer(flushCallback);
+      waiting = true;
+    }
+  }
+  var lifecycleHooks = ['beforeCreate', 'created', 'beforeMount', 'mounted', 'beforeUpdate', 'updated', 'beforeDestroy', 'destroyed'];
+  /*
+    第一种情况：  parentVal = {  }    childVal = { beforeCreate:Fn1}
+               需要合并成: options=  {  beforeCreate: [ Fn1]   }
+
+    第二种情况： parentValu= { beforeCreate: Fn1 }  childVal = { beforeCreate: Fn2}
+              需要合并成： options = { beforeCreate: [ Fn1, Fn2]}
+
+    第三种情况： parentValu= { beforeCreate: Fn1 }  childVal = { }
+              需要合并成： options = { beforeCreate: Fn1 }
+  */
+
+  function mergeHook(parentVal, childVal) {
+    if (childVal) {
+      if (parentVal) {
+        return parentVal.concat(childVal);
+      } else {
+        // 有childVal 没parentVal
+        return [childVal];
+      }
+    } else {
+      return parentVal;
+    }
+  }
+
+  var strats = {}; // 存放的各种策略
+
+  lifecycleHooks.forEach(function (hook) {
+    strats[hook] = mergeHook;
+  }); // strats.component = function(){
+  // }
+
+  function mergeOptions(parent, child) {
+    //  parent = { a:1, data:{} }  child = { data: {} }
+    var options = {}; // 合并后的选项
+
+    for (var key in parent) {
+      mergeField(key);
+    }
+
+    for (var _key in child) {
+      // 如果parent中有，则不用合并因为上面循环已经合并了
+      if (parent.hasOwnProperty(_key)) {
+        continue;
+      }
+
+      mergeField(_key);
+    }
+
+    function mergeField(key) {
+      var parentVal = parent[key];
+      var childVal = child[key]; // 如果是对象  进行合并
+      // 策略模式
+
+      if (strats[key]) {
+        options[key] = strats[key](parentVal, childVal);
+      } else {
+        if (isObject(parentVal) && isObject(child)) {
+          options[key] = _objectSpread2(_objectSpread2({}, parentVal), childVal);
+        } // 非对象 以child为准
+        else {
+          options[key] = child[key];
+        }
+      }
+    }
+
+    return options;
+  } // test   mergeOptions({ beforCreate:fn1 }, { beforCreate:fn2}  )
+
+  function initGlobalApi(Vue) {
+    Vue.options = {}; // 用来存放全局属性的  如 Vue.component()  Vue.filter() Vue.directive()
+    // 每个组件初始化的时候，都会和options选项进行合并
+
+    Vue.mixin = function (options) {
+      this.options = mergeOptions(this.options, options);
+      return this;
+    };
+  }
+
   /**
    * generate 将ast生成render函数
    *
@@ -245,41 +460,6 @@
     return render;
   }
 
-  function _typeof(obj) {
-    "@babel/helpers - typeof";
-
-    return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (obj) {
-      return typeof obj;
-    } : function (obj) {
-      return obj && "function" == typeof Symbol && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
-    }, _typeof(obj);
-  }
-
-  function _classCallCheck(instance, Constructor) {
-    if (!(instance instanceof Constructor)) {
-      throw new TypeError("Cannot call a class as a function");
-    }
-  }
-
-  function _defineProperties(target, props) {
-    for (var i = 0; i < props.length; i++) {
-      var descriptor = props[i];
-      descriptor.enumerable = descriptor.enumerable || false;
-      descriptor.configurable = true;
-      if ("value" in descriptor) descriptor.writable = true;
-      Object.defineProperty(target, descriptor.key, descriptor);
-    }
-  }
-
-  function _createClass(Constructor, protoProps, staticProps) {
-    if (protoProps) _defineProperties(Constructor.prototype, protoProps);
-    if (staticProps) _defineProperties(Constructor, staticProps);
-    Object.defineProperty(Constructor, "prototype", {
-      writable: false
-    });
-    return Constructor;
-  }
-
   // 依赖收集  每个属性都分配一个Dep  Dep可以用来存放watcher 反过来 watcher中也要存放dep
   var id$1 = 0;
   var Dep = /*#__PURE__*/function () {
@@ -326,67 +506,6 @@
   function popTarget() {
     stack.pop();
     Dep.target = stack[stack.length - 1];
-  }
-
-  function isfn(fn) {
-    return typeof fn === "function";
-  }
-  function isObject(obj) {
-    return _typeof(obj) == "object" && obj != null;
-  }
-  var callbacks = [];
-
-  function flushCallback() {
-    callbacks.forEach(function (cb) {
-      cb();
-    });
-    callbacks = [];
-    waiting = false;
-  }
-
-  function timer(flushCallback) {
-    var timerFn = function timerFn() {};
-
-    if (Promise) {
-      // 微任务
-      timerFn = function timerFn() {
-        Promise.resolve().then(flushCallback);
-      };
-    } else if (MutationObserver) {
-      // 微任务
-      var textNode = document.createTextNode(1);
-      var observe = new MutationObserver(flushCallback);
-      observe.observe(textNode, {
-        characterData: true
-      });
-
-      timerFn = function timerFn() {
-        textNode.textContent = 3;
-      };
-    } else if (setImmediate) {
-      timerFn = function timerFn() {
-        setImmediate(flushCallback);
-      };
-    } else {
-      timerFn = function timerFn() {
-        setTimeout(flushCallback, 0);
-      };
-    }
-
-    timerFn();
-  } // 内部先调用nextick ：flushSchedulerQueue
-  //用户后调nextick vm.$nextick(function(){console.log( vm.$el)});
-  // 内部和用户各一共调用2次nextTick，其实更新视图逻辑只需执行一次  防抖处理
-
-
-  var waiting = false;
-  function nextick(cb) {
-    callbacks.push(cb);
-
-    if (!waiting) {
-      timer(flushCallback);
-      waiting = true;
-    }
   }
 
   var queue = []; // 存放更新视图的watcher 去重
@@ -595,10 +714,20 @@
     // updateComponent();
 
 
+    callHook(vm, 'beforeMount');
     new Watcher(vm, updateComponent, function () {
       console.log("数据更新了");
     }, true // 标识  它是一个渲染watcher，后续还有其它的watcher
     );
+  }
+  function callHook(vm, hook) {
+    var handlers = vm.$options[hook];
+
+    if (handlers) {
+      for (var i = 0; i < handlers.length; i++) {
+        handlers[i].call(vm);
+      }
+    }
   }
 
   var oldArrayPrototype = Array.prototype;
@@ -864,9 +993,11 @@
   function initMixin(Vue) {
     Vue.prototype._init = function (options) {
       var vm = this;
-      vm.$options = options; // 对数据进行初始化 data el methods computed props
+      vm.$options = mergeOptions(this.constructor.options, options);
+      callHook(vm, 'beforeCreate'); // 对数据进行初始化 data el methods computed props
 
-      initState(vm); // 模板编译
+      initState(vm);
+      callHook(vm, 'created'); // 模板编译
 
       if (vm.$options.el) {
         vm.$mount(vm.$options.el);
@@ -954,7 +1085,9 @@
 
   lifecycleMixin(Vue); // _update
 
-  stateMixin(Vue);
+  stateMixin(Vue); // 在类上扩展
+
+  initGlobalApi(Vue);
 
   return Vue;
 

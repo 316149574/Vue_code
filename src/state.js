@@ -82,7 +82,6 @@ function createComputedGetter(key) {
     if (watcher.dirty) {
       watcher.evaluate(); // 求值函数  其实就是调getter  fullname() {return this.firstname + this.lastname;}  调get会取fristname 和 lasename 此时会讲wacther存放到依赖属性的dep种
     }
-
     // 如果当前Dep上还有值， 则应继续向上收集（渲染watcher）
     if (Dep.target) {
       watcher.depend(); // watcher里面有多个dep

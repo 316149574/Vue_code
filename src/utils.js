@@ -15,7 +15,7 @@ function flushCallback() {
   waiting = false;
 }
 function timer(flushCallback) {
-  let timerFn = () => {};
+  let timerFn = () => { };
   if (Promise) {
     // 微任务
     timerFn = () => {
@@ -53,3 +53,79 @@ export function nextick(cb) {
     waiting = true;
   }
 }
+
+let lifecycleHooks = [
+  'beforeCreate',
+  'created',
+  'beforeMount',
+  'mounted',
+  'beforeUpdate',
+  'updated',
+  'beforeDestroy',
+  'destroyed'
+
+]
+/*
+  第一种情况：  parentVal = {  }    childVal = { beforeCreate:Fn1}
+             需要合并成: options=  {  beforeCreate: [ Fn1]   }
+
+  第二种情况： parentValu= { beforeCreate: Fn1 }  childVal = { beforeCreate: Fn2}
+            需要合并成： options = { beforeCreate: [ Fn1, Fn2]}
+
+  第三种情况： parentValu= { beforeCreate: Fn1 }  childVal = { }
+            需要合并成： options = { beforeCreate: Fn1 }
+*/
+function mergeHook (parentVal, childVal){
+  if(childVal){
+     if(parentVal){
+        return  parentVal.concat(childVal);
+     }else{
+       // 有childVal 没parentVal
+        return [ childVal]
+     }
+  }else{
+    return parentVal;
+  }
+}
+let strats = {}; // 存放的各种策略
+
+lifecycleHooks.forEach(function(hook){
+   strats[hook] = mergeHook;
+})
+// strats.component = function(){
+
+// }
+export function mergeOptions(parent, child) {
+  //  parent = { a:1, data:{} }  child = { data: {} }
+  const options = {}  // 合并后的选项
+  for (let key in parent) {
+    mergeField(key)
+  }
+  for (let key in child) {
+    // 如果parent中有，则不用合并因为上面循环已经合并了
+    if (parent.hasOwnProperty(key)) {
+      continue;
+    }
+    mergeField(key);
+  }
+  function mergeField(key) {
+    let parentVal = parent[key];
+    let childVal = child[key];
+    // 如果是对象  进行合并
+    // 策略模式
+    if (strats[key]) {
+       options[key] = strats[key](parentVal, childVal)
+    } else {
+      if (isObject(parentVal) && isObject(child)) {
+        options[key] = { ...parentVal, ...childVal }
+      }
+      // 非对象 以child为准
+      else {
+        options[key] = child[key];
+      }
+    }
+
+  }
+  return options;
+}
+// test   mergeOptions({ beforCreate:fn1 }, { beforCreate:fn2}  )
