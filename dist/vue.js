@@ -140,7 +140,7 @@
       waiting = true;
     }
   }
-  var lifecycleHooks = ['beforeCreate', 'created', 'beforeMount', 'mounted', 'beforeUpdate', 'updated', 'beforeDestroy', 'destroyed'];
+  var lifecycleHooks = ["beforeCreate", "created", "beforeMount", "mounted", "beforeUpdate", "updated", "beforeDestroy", "destroyed"];
   /*
     第一种情况：  parentVal = {  }    childVal = { beforeCreate:Fn1}
                需要合并成: options=  {  beforeCreate: [ Fn1]   }
@@ -169,8 +169,19 @@
 
   lifecycleHooks.forEach(function (hook) {
     strats[hook] = mergeHook;
-  }); // strats.component = function(){
-  // }
+  });
+
+  strats.components = function (parentVal, childVal) {
+    var options = Object.create(parentVal);
+
+    if (childVal) {
+      for (var key in childVal) {
+        options[key] = parentVal[key];
+      }
+    }
+
+    return options;
+  };
 
   function mergeOptions(parent, child) {
     //  parent = { a:1, data:{} }  child = { data: {} }
@@ -216,6 +227,29 @@
     Vue.mixin = function (options) {
       this.options = mergeOptions(this.options, options);
       return this;
+    };
+
+    Vue.options.components = {};
+    Vue.options._base = Vue;
+
+    Vue.component = function (id, definition) {
+      // 保证组件的隔离， 每个组件都要产生一个新的类， 去继承父类
+      definition = this.options._base.extend(definition);
+      this.options.components[id] = definition;
+    };
+
+    Vue.extend = function (opts) {
+      var Super = this;
+
+      var Sub = function VueComponent() {
+        this._init();
+      }; // 原型继承
+
+
+      Sub.prototype = Object.create(this.prototype);
+      Sub.prototype.constructor = Sub;
+      Sub.options = mergeOptions(Super.options, opts);
+      return Sub;
     };
   }
 
@@ -994,10 +1028,10 @@
     Vue.prototype._init = function (options) {
       var vm = this;
       vm.$options = mergeOptions(this.constructor.options, options);
-      callHook(vm, 'beforeCreate'); // 对数据进行初始化 data el methods computed props
+      callHook(vm, "beforeCreate"); // 对数据进行初始化 data el methods computed props
 
       initState(vm);
-      callHook(vm, 'created'); // 模板编译
+      callHook(vm, "created"); // 模板编译
 
       if (vm.$options.el) {
         vm.$mount(vm.$options.el);

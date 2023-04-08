@@ -7,10 +7,11 @@ export function initMixin(Vue) {
   Vue.prototype._init = function (options) {
     const vm = this;
     vm.$options = mergeOptions(this.constructor.options, options);
-     callHook(vm, 'beforeCreate')
+
+    callHook(vm, "beforeCreate");
     // 对数据进行初始化 data el methods computed props
     initState(vm);
-    callHook(vm, 'created')
+    callHook(vm, "created");
     // 模板编译
     if (vm.$options.el) {
       vm.$mount(vm.$options.el);

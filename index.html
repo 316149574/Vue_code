@@ -15,32 +15,30 @@
     <div id="app"></div>
 
     <script>
-        Vue.mixin({
-          beforeCreate(){
-             console.log(1);
-          }
-        })
+      // Vue.mixin({
+      //   beforeCreate(){
+      //      console.log(1);
+      //   }
+      // })
 
-        Vue.mixin({
-          beforeCreate(){
-            console.log(2);
-          }
-        })
-        const vm = new Vue({
-           el:"#app",
-           beforeCreate(){
-             console.log("状态初始化前");
-           },
-           created(){
-             console.log("状态初始化完成")
-           },
-           beforeMount(){
-             console.log("数据挂载前")
-           }
-        })
-        
-     
-     
+      // Vue.mixin({
+      //   beforeCreate(){
+      //     console.log(2);
+      //   }
+      // })
+      // name的优先级高于tab-btn优先级
+      Vue.component("tab-btn", {
+        name: "XXX",
+        template: "<div>global btn</div>",
+      });
+      const vm = new Vue({
+        el: "#app",
+        components: {
+          "tab-btn": {
+            template: "<div> scope btn</div>",
+          },
+        },
+      });
     </script>
   </body>
 </html>
