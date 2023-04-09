@@ -17,15 +17,17 @@ export function initGlobalApi(Vue) {
     this.options.components[id] = definition;
   };
 
+  // extend 给一个对象（definition）返回一个类（Sub）
   Vue.extend = function (opts) {
     const Super = this;
-    const Sub = function VueComponent() {
-      this._init();
+    const Sub = function VueComponent(options) {
+      this._init(options);
     };
-
     // 原型继承
     Sub.prototype = Object.create(this.prototype);
+    //  需要重写constructor 否则构造函数是指的父类的构造函数
     Sub.prototype.constructor = Sub;
+    // Vue的options与Vue.component( '')中的options（definition）合并
     Sub.options = mergeOptions(Super.options, opts);
 
     return Sub;

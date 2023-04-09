@@ -12,7 +12,10 @@
     <!--  在页面直接写fullname时 ， fullname不会收集渲染watcher （和其它属性不是同一个get）， 因为fullname没有dep，没有收集功能 -->
     <!-- this.firstname 和this.lastname 执行get会取值进行依赖收集  是在计算属性中使用的，所以它会收集计算属性watcher -->
     <!-- this.firstname 和this.lastname 应该收集计算watcher和渲染watcher -->
-    <div id="app"></div>
+    <div id="app">
+      {{message}}
+       <tab-btn></tab-btn>
+    </div>
 
     <script>
       // Vue.mixin({
@@ -29,10 +32,18 @@
       // name的优先级高于tab-btn优先级
       Vue.component("tab-btn", {
         name: "XXX",
-        template: "<div>global btn</div>",
+        data:function(){
+          return {
+              value:"我是按钮组件"
+          }
+        },
+        template: "<button>{{value}}</button>",
       });
       const vm = new Vue({
         el: "#app",
+        data:{
+           message:"hello Vuejs"
+        },
         components: {
           "tab-btn": {
             template: "<div> scope btn</div>",

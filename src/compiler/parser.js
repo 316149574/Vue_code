@@ -11,6 +11,50 @@ const endTag = new RegExp("^<\\/".concat(qnameCapture, "[^>]*>")); // 匹配闭�
 
 // htmlparser2 第三方插件与parserHTML一样  把html转化成ast语法树
 export function parserHTML(html) {
+  let root = null;
+let stack = []; // 用于存放解析标签   >>>>栈 先进后出
+
+//  匹配到一个节点： 标记节点的父亲是谁 ，父亲的儿子是当次匹配的节点 （双向标记）
+function start(tagName, attributes) {
+  let parent = stack[stack.length - 1];
+  let element = createAstElement(tagName, attributes);
+  if (!root) {
+    root = element;
+  }
+  if (parent) {
+    element.parent = parent; // 记录节点的父亲
+    parent.children.push(element); // 记录父亲的儿子
+  }
+  stack.push(element);
+}
+
+function chars(text) {
+  text = text.replace(/\s+/g, "");
+  if (text) {
+    let parent = stack[stack.length - 1];
+    parent.children.push({
+      type: 3,
+      text,
+    });
+  }
+}
+function end(tagName) {
+  let last = stack.pop();
+  if (last.tag != tagName) {
+    throw new Error("标签格式有误");
+  }
+}
+// 将解析后的结果 组装成一个树结构 -----栈
+function createAstElement(tagName, attrs) {
+  return {
+    tag: tagName,
+    type: 1,
+    children: [],
+    parent: null,
+    attrs,
+  };
+}
+//  html标签解析成DOM树 <div id="app"> {{name}}</div>
   //  前进删除以匹配的内容
   function advance(len) {
     html = html.substring(len);
@@ -78,47 +122,4 @@ export function parserHTML(html) {
   return root;
 }
 
-let root = null;
-let stack = []; // 用于存放解析标签   >>>>栈 先进后出
 
-//  匹配到一个节点： 标记节点的父亲是谁 ，父亲的儿子是当次匹配的节点 （双向标记）
-function start(tagName, attributes) {
-  let parent = stack[stack.length - 1];
-  let element = createAstElement(tagName, attributes);
-  if (!root) {
-    root = element;
-  }
-  if (parent) {
-    element.parent = parent; // 记录节点的父亲
-    parent.children.push(element); // 记录父亲的儿子
-  }
-  stack.push(element);
-}
-
-function chars(text) {
-  text = text.replace(/\s+/g, "");
-  if (text) {
-    let parent = stack[stack.length - 1];
-    parent.children.push({
-      type: 3,
-      text,
-    });
-  }
-}
-function end(tagName) {
-  let last = stack.pop();
-  if (last.tag != tagName) {
-    throw new Error("标签格式有误");
-  }
-}
-// 将解析后的结果 组装成一个树结构 -----栈
-function createAstElement(tagName, attrs) {
-  return {
-    tag: tagName,
-    type: 1,
-    children: [],
-    parent: null,
-    attrs,
-  };
-}
-//  html标签解析成DOM树 <div id="app"> {{name}}</div>

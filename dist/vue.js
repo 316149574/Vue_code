@@ -176,7 +176,7 @@
 
     if (childVal) {
       for (var key in childVal) {
-        options[key] = parentVal[key];
+        options[key] = childVal[key];
       }
     }
 
@@ -212,13 +212,19 @@
           options[key] = _objectSpread2(_objectSpread2({}, parentVal), childVal);
         } // 非对象 以child为准
         else {
-          options[key] = child[key];
+          // 父亲中有，儿子中没有
+          options[key] = child[key] || parent[key];
         }
       }
     }
 
     return options;
   } // test   mergeOptions({ beforCreate:fn1 }, { beforCreate:fn2}  )
+
+  function isReservedTag(tag) {
+    var reservedTag = "html,body,base,head,link,meta,style,title," + "address,article,aside,footer,header,h1,h2,h3,h4,h5,h6,hgroup,nav,section," + "div,dd,dl,dt,figcaption,figure,picture,hr,img,li,main,ol,p,pre,ul," + "a,b,abbr,bdi,bdo,br,cite,code,data,dfn,em,i,kbd,mark,q,rp,rt,rtc,ruby," + "s,samp,small,span,strong,sub,sup,time,u,var,wbr,area,audio,map,track,video," + "embed,object,param,source,canvas,script,noscript,del,ins," + "caption,col,colgroup,table,thead,tbody,td,th,tr," + "button,datalist,fieldset,form,input,label,legend,meter,optgroup,option," + "output,progress,select,textarea," + "details,dialog,menu,menuitem,summary," + "content,element,shadow,template,blockquote,iframe,tfoot";
+    return reservedTag.includes(tag);
+  }
 
   function initGlobalApi(Vue) {
     Vue.options = {}; // 用来存放全局属性的  如 Vue.component()  Vue.filter() Vue.directive()
@@ -236,18 +242,21 @@
       // 保证组件的隔离， 每个组件都要产生一个新的类， 去继承父类
       definition = this.options._base.extend(definition);
       this.options.components[id] = definition;
-    };
+    }; // extend 给一个对象（definition）返回一个类（Sub）
+
 
     Vue.extend = function (opts) {
       var Super = this;
 
-      var Sub = function VueComponent() {
-        this._init();
+      var Sub = function VueComponent(options) {
+        this._init(options);
       }; // 原型继承
 
 
-      Sub.prototype = Object.create(this.prototype);
-      Sub.prototype.constructor = Sub;
+      Sub.prototype = Object.create(this.prototype); //  需要重写constructor 否则构造函数是指的父类的构造函数
+
+      Sub.prototype.constructor = Sub; // Vue的options与Vue.component( '')中的options（definition）合并
+
       Sub.options = mergeOptions(Super.options, opts);
       return Sub;
     };
@@ -357,7 +366,60 @@
   // htmlparser2 第三方插件与parserHTML一样  把html转化成ast语法树
 
   function parserHTML(html) {
+    var root = null;
+    var stack = []; // 用于存放解析标签   >>>>栈 先进后出
+    //  匹配到一个节点： 标记节点的父亲是谁 ，父亲的儿子是当次匹配的节点 （双向标记）
+
+    function start(tagName, attributes) {
+      var parent = stack[stack.length - 1];
+      var element = createAstElement(tagName, attributes);
+
+      if (!root) {
+        root = element;
+      }
+
+      if (parent) {
+        element.parent = parent; // 记录节点的父亲
+
+        parent.children.push(element); // 记录父亲的儿子
+      }
+
+      stack.push(element);
+    }
+
+    function chars(text) {
+      text = text.replace(/\s+/g, "");
+
+      if (text) {
+        var parent = stack[stack.length - 1];
+        parent.children.push({
+          type: 3,
+          text: text
+        });
+      }
+    }
+
+    function end(tagName) {
+      var last = stack.pop();
+
+      if (last.tag != tagName) {
+        throw new Error("标签格式有误");
+      }
+    } // 将解析后的结果 组装成一个树结构 -----栈
+
+
+    function createAstElement(tagName, attrs) {
+      return {
+        tag: tagName,
+        type: 1,
+        children: [],
+        parent: null,
+        attrs: attrs
+      };
+    } //  html标签解析成DOM树 <div id="app"> {{name}}</div>
     //  前进删除以匹配的内容
+
+
     function advance(len) {
       html = html.substring(len);
     }
@@ -433,57 +495,6 @@
 
     return root;
   }
-  var root = null;
-  var stack$1 = []; // 用于存放解析标签   >>>>栈 先进后出
-  //  匹配到一个节点： 标记节点的父亲是谁 ，父亲的儿子是当次匹配的节点 （双向标记）
-
-  function start(tagName, attributes) {
-    var parent = stack$1[stack$1.length - 1];
-    var element = createAstElement(tagName, attributes);
-
-    if (!root) {
-      root = element;
-    }
-
-    if (parent) {
-      element.parent = parent; // 记录节点的父亲
-
-      parent.children.push(element); // 记录父亲的儿子
-    }
-
-    stack$1.push(element);
-  }
-
-  function chars(text) {
-    text = text.replace(/\s+/g, "");
-
-    if (text) {
-      var parent = stack$1[stack$1.length - 1];
-      parent.children.push({
-        type: 3,
-        text: text
-      });
-    }
-  }
-
-  function end(tagName) {
-    var last = stack$1.pop();
-
-    if (last.tag != tagName) {
-      throw new Error("标签格式有误");
-    }
-  } // 将解析后的结果 组装成一个树结构 -----栈
-
-
-  function createAstElement(tagName, attrs) {
-    return {
-      tag: tagName,
-      type: 1,
-      children: [],
-      parent: null,
-      attrs: attrs
-    };
-  } //  html标签解析成DOM树 <div id="app"> {{name}}</div>
 
   function compileToFunction(template) {
     var root = parserHTML(template); // html===>ast（只能描述语法，语法不存在的无法描述）====>render函数======> 虚拟DOM=======>生成真实DOM
@@ -697,6 +708,11 @@
    * */
 
   function patch(oldVnode, vnode) {
+    if (!oldVnode) {
+      // 组件
+      return createElm(vnode);
+    }
+
     if (oldVnode.nodeType == 1) {
       var parentElm = oldVnode.parentNode;
       var elm = createElm(vnode); // 根据虚拟节点创建真实DOM
@@ -705,7 +721,21 @@
       parentElm.removeChild(oldVnode);
       return elm; // 第一次渲染后 删除了vm.$el 所以最后要返回新的elm
     }
+  }
+
+  function createComponent$1(vnode) {
+    var i = vnode.data;
+
+    if ((i = i.hook) && (i = i.init)) {
+      i(vnode);
+    }
+
+    if (vnode.componentInstance) {
+      // 有属性， 说明组件new完了， 并且组件对应的真是DOM挂载到了componentInstance上
+      return true;
+    }
   } // 核心方法 createElm方法  将虚拟DOM转换成真实DOM
+
 
   function createElm(vnode) {
     var tag = vnode.tag;
@@ -715,7 +745,12 @@
         vnode.vm;
 
     if (typeof tag == "string") {
-      // 元素
+      // 组件
+      if (createComponent$1(vnode)) {
+        return vnode.componentInstance.$el;
+      } // 元素
+
+
       vnode.el = document.createElement(tag); // 虚拟节点vnode有一个el属性对应真实节点
 
       children.forEach(function (child) {
@@ -1050,12 +1085,14 @@
 
         if (!template && el) {
           template = el.outerHTML;
-          var render = compileToFunction(template);
-          options.render = render; // options.render函数就是渲染函数,接下来 调用render方法，渲染成真实DOM，替换掉页面内容
-          // 将组件vm实例挂载到el上---组件的挂载流程
+        } // 经过编译得到render函数 
 
-          mountComponent(vm);
-        }
+
+        var render = compileToFunction(template);
+        options.render = render; // options.render函数就是渲染函数,接下来 调用render方法，渲染成真实DOM，替换掉页面内容
+        // 将组件vm实例挂载到el上---组件的挂载流程
+
+        mountComponent(vm);
       }
     };
   }
@@ -1067,20 +1104,50 @@
       children[_key - 3] = arguments[_key];
     }
 
-    return vnode(vm, tag, data, data.name, children, undefined);
+    // 如果tag是一个组件，则需要渲染组件的vnode
+    if (isReservedTag(tag)) {
+      return vnode(vm, tag, data, data.key, children, undefined);
+    } else {
+      // 组件虚拟DOM
+      var Ctor = vm.$options.components[tag];
+      return createComponent(vm, tag, data, data.key, children, Ctor);
+    }
+  } // 创建组件的虚拟节点
+
+  function createComponent(vm, tag, data, key, children, Ctor) {
+    if (isObject(Ctor)) {
+      Ctor = vm.$options._base.extend(Ctor);
+    } // 渲染组件时，需要调用此初始化方法
+
+
+    data.hook = {
+      init: function init(vnode) {
+        var vm = vnode.componentInstance = new Ctor({
+          _iscomponent: true
+        }); // new Sub
+
+        vm.$mount();
+      }
+    };
+    return vnode(vm, "vue-component-".concat(tag), data, key, undefined, undefined, {
+      Ctor: Ctor,
+      children: children
+    });
   }
+
   function createTextElement(vm, text) {
     return vnode(vm, undefined, undefined, undefined, undefined, text);
   }
 
-  function vnode(vm, tag, data, key, children, text) {
+  function vnode(vm, tag, data, key, children, text, componentOptions) {
     return {
       vm: vm,
       tag: tag,
       data: data,
       key: key,
       children: children,
-      text: text
+      text: text,
+      componentOptions: componentOptions
     };
   }
 
