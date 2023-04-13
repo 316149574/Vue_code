@@ -13,7 +13,7 @@ export function initGlobalApi(Vue) {
   Vue.options._base = Vue;
   Vue.component = function (id, definition) {
     // 保证组件的隔离， 每个组件都要产生一个新的类， 去继承父类
-    definition = this.options._base.extend(definition); 
+    definition = this.options._base.extend(definition);
     this.options.components[id] = definition;
   };
 

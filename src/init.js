@@ -6,9 +6,7 @@ import { mergeOptions } from "./utils";
 export function initMixin(Vue) {
   Vue.prototype._init = function (options) {
     const vm = this;
-  
     vm.$options = mergeOptions(this.constructor.options, options);
-
     callHook(vm, "beforeCreate");
     // 对数据进行初始化 data el methods computed props
     initState(vm);
@@ -29,13 +27,12 @@ export function initMixin(Vue) {
       let template = options.template;
       if (!template && el) {
         template = el.outerHTML;
-        
       }
-       // 经过编译得到render函数 
-       let render = compileToFunction(template);
-       options.render = render;
-       // options.render函数就是渲染函数,接下来 调用render方法，渲染成真实DOM，替换掉页面内容
-       // 将组件vm实例挂载到el上---组件的挂载流程
+      // 经过编译得到render函数
+      let render = compileToFunction(template);
+      options.render = render;
+      // options.render函数就是渲染函数,接下来 调用render方法，渲染成真实DOM，替换掉页面内容
+      // 将组件vm实例挂载到el上---组件的挂载流程
       mountComponent(vm, el);
     }
   };

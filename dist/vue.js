@@ -343,7 +343,8 @@
 
   function generate(el) {
     var children = genChildren(el);
-    var code = "_c(  \"".concat(el.tag, "\", ").concat(el.attrs.length ? genProps(el.attrs) : "undefined", " ").concat(children ? ",".concat(children) : " ", "  )");
+    var code = "_c(  \"".concat(el.tag, "\", ").concat(el.attrs.length ? genProps(el.attrs) : "undefined", " ").concat(children ? ",".concat(children) : " ", "  )"); // console.log(code);
+
     return code;
   }
   /*
@@ -497,11 +498,14 @@
   }
 
   function compileToFunction(template) {
-    var root = parserHTML(template); // html===>ast（只能描述语法，语法不存在的无法描述）====>render函数======> 虚拟DOM=======>生成真实DOM
+    var root = parserHTML(template); // console.log(root, "====root");
+    // html===>ast（只能描述语法，语法不存在的无法描述）====>render函数======> 虚拟DOM=======>生成真实DOM
 
-    var code = generate(root); //    render函数: new Function +with
+    var code = generate(root); // console.log(code, "====code");
+    //    render函数: new Function +with
 
-    var render = new Function("with(this){return ".concat(code, "}"));
+    var render = new Function("with(this){return ".concat(code, "}")); // console.log(render, "+++++render");
+
     return render;
   }
 
@@ -720,6 +724,38 @@
       parentElm.insertBefore(elm, oldVnode.nextSibling);
       parentElm.removeChild(oldVnode);
       return elm; // 第一次渲染后 删除了vm.$el 所以最后要返回新的elm
+    } else {
+      // 如果标签名不一样  将标签名替换成新的
+      if (oldVnode !== vnode) {
+        return oldVnode.el.parentNode.replaceChild(createElm(vnode), oldVnode.el);
+      } // 如果标签一样， 比较属性
+
+
+      vnode.el = oldVnode.el; // 表示当前新节点复用老节点
+
+      patchProps(vnode, oldVnode.data);
+    }
+  } // 属性的比较  初次渲染时，可以调用此方法，后续更新时也可以调用此方法
+
+  function patchProps(vnode, oldProps) {
+    var newProps = vnode.data || {};
+    var el = vnode.el; // 如果老的有属性而新的没有， 则直接删除老的
+
+    for (var key in oldProps) {
+      if (!newProps[key]) {
+        el.removeAttribute(key);
+      }
+    } //直接用新的生成到元素上
+
+
+    for (var _key in newProps) {
+      if (_key == "style") {
+        for (var stylename in newProps.style) {
+          el.style[stylename] = newProps.style[stylename];
+        }
+      } else {
+        el.setAttribute(_key, newProps[_key]);
+      }
     }
   }
 
@@ -752,7 +788,9 @@
 
 
       vnode.el = document.createElement(tag); // 虚拟节点vnode有一个el属性对应真实节点
+      // 给虚拟节点增加属性
 
+      patchProps(vnode);
       children.forEach(function (child) {
         vnode.el.appendChild(createElm(child));
       });
@@ -783,7 +821,7 @@
     // updateComponent();
 
 
-    callHook(vm, 'beforeMount');
+    callHook(vm, "beforeMount");
     new Watcher(vm, updateComponent, function () {
       console.log("数据更新了");
     }, true // 标识  它是一个渲染watcher，后续还有其它的watcher
@@ -1085,7 +1123,7 @@
 
         if (!template && el) {
           template = el.outerHTML;
-        } // 经过编译得到render函数 
+        } // 经过编译得到render函数
 
 
         var render = compileToFunction(template);
@@ -1104,11 +1142,11 @@
       children[_key - 3] = arguments[_key];
     }
 
-    // 如果tag是一个组件，则需要渲染组件的vnode
+    // 原生标签
     if (isReservedTag(tag)) {
       return vnode(vm, tag, data, data.key, children, undefined);
     } else {
-      // 组件虚拟DOM
+      // 如果tag是一个组件，则需要渲染组件的vnode组件虚拟DOM
       var Ctor = vm.$options.components[tag];
       return createComponent(vm, tag, data, data.key, children, Ctor);
     }
@@ -1116,6 +1154,7 @@
 
   function createComponent(vm, tag, data, key, children, Ctor) {
     if (isObject(Ctor)) {
+      //
       Ctor = vm.$options._base.extend(Ctor);
     } // 渲染组件时，需要调用此初始化方法
 
@@ -1188,7 +1227,28 @@
 
   stateMixin(Vue); // 在类上扩展
 
-  initGlobalApi(Vue);
+  initGlobalApi(Vue); // diff 核心
+  var oldTemplate = "<div style=\"color:red;\" a=\"1\">www{{name}}</div>";
+  var vm1 = new Vue({
+    data: {
+      name: "duanli"
+    }
+  });
+  var render1 = compileToFunction(oldTemplate);
+  var oldVnode = render1.call(vm1);
+  document.body.appendChild(createElm(oldVnode));
+  var newTemplate = "<p style=\"color:blue;\" b=\"2\">{{name}}</p>";
+  var vm2 = new Vue({
+    data: {
+      name: "chenchen"
+    }
+  });
+  var render2 = compileToFunction(newTemplate);
+  var newVnode = render2.call(vm2); // 根据新的虚拟节点 更新老的虚拟节点 老的能复用尽量复用
+
+  setTimeout(function () {
+    patch(oldVnode, newVnode);
+  }, 1000);
 
   return Vue;
 
