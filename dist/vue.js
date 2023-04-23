@@ -726,22 +726,57 @@
       return elm; // 第一次渲染后 删除了vm.$el 所以最后要返回新的elm
     } else {
       // 如果标签名不一样  将标签名替换成新的
-      if (oldVnode !== vnode) {
+      if (oldVnode.tag !== vnode.tag) {
         return oldVnode.el.parentNode.replaceChild(createElm(vnode), oldVnode.el);
       } // 如果标签一样， 比较属性
 
 
-      vnode.el = oldVnode.el; // 表示当前新节点复用老节点
+      var el = vnode.el = oldVnode.el; // 表示当前新节点复用老节点(因为标签一样 可以复用 此时新vnode还为执行createEle 所以没有vnode.el)
+      // 如果两个vnode的节点是文本节点，则比较内容
+
+      if (vnode.tag == undefined) {
+        // 新老都是文本
+        if (oldVnode.text !== vnode.text) {
+          el.textContent = vnode.text;
+        }
+
+        return;
+      }
 
       patchProps(vnode, oldVnode.data);
+      var oldChildren = oldVnode.children || [];
+      var newChildren = vnode.children || []; // 双方都有children
+
+      if (oldChildren.length > 0 && newChildren.length > 0) ; else if (newChildren.length > 0) {
+        // 老的没儿子 新的有儿子
+        for (var i = 0; i < newChildren.length; i++) {
+          var child = createElm(newChildren[i]);
+          el.appendChild(child);
+        }
+      } else if (oldChildren.length > 0) {
+        // 老的有儿子  新的没儿子
+        el.innerHTML = "";
+      } // 
+
     }
   } // 属性的比较  初次渲染时，可以调用此方法，后续更新时也可以调用此方法
 
-  function patchProps(vnode, oldProps) {
+  function patchProps(vnode) {
+    var oldProps = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
     var newProps = vnode.data || {};
-    var el = vnode.el; // 如果老的有属性而新的没有， 则直接删除老的
+    var el = vnode.el;
+    var newStyle = newProps.style || {};
+    var oldStyel = oldProps.style || {};
+
+    for (var attr in oldStyel) {
+      if (!newStyle[attr]) {
+        el.style[attr] = "";
+      }
+    } // 如果老的有属性而新的没有， 则直接删除老的
+
 
     for (var key in oldProps) {
+      // 老的css样式如果新的中不存在，则删除
       if (!newProps[key]) {
         el.removeAttribute(key);
       }
@@ -1228,7 +1263,7 @@
   stateMixin(Vue); // 在类上扩展
 
   initGlobalApi(Vue); // diff 核心
-  var oldTemplate = "<div style=\"color:red;\" a=\"1\">www{{name}}</div>";
+  var oldTemplate = "<div style=\"color:blue;border:1px solid red;\" a=\"1\">www{{name}}</div>";
   var vm1 = new Vue({
     data: {
       name: "duanli"
@@ -1237,7 +1272,7 @@
   var render1 = compileToFunction(oldTemplate);
   var oldVnode = render1.call(vm1);
   document.body.appendChild(createElm(oldVnode));
-  var newTemplate = "<p style=\"color:blue;\" b=\"2\">{{name}}</p>";
+  var newTemplate = "<div style=\"font-size:100px;\" b=\"2\">{{name}}</div>";
   var vm2 = new Vue({
     data: {
       name: "chenchen"

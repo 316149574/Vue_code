@@ -18,7 +18,7 @@ initGlobalApi(Vue);
 import { compileToFunction } from "./compiler/index.js";
 import { createElm, patch } from "./vdom/patch.js";
 
-let oldTemplate = `<div style="color:red;" a="1">www{{name}}</div>`;
+let oldTemplate = `<div style="color:blue;border:1px solid red;" a="1">www{{name}}</div>`;
 
 let vm1 = new Vue({ data: { name: "duanli" } });
 const render1 = compileToFunction(oldTemplate);
@@ -27,7 +27,7 @@ const oldVnode = render1.call(vm1);
 
 document.body.appendChild(createElm(oldVnode));
 
-let newTemplate = `<p style="color:blue;" b="2">{{name}}</p>`;
+let newTemplate = `<div style="font-size:100px;" b="2">{{name}}</div>`;
 let vm2 = new Vue({ data: { name: "chenchen" } });
 const render2 = compileToFunction(newTemplate);
 const newVnode = render2.call(vm2);

@@ -12,27 +12,62 @@ export function patch(oldVnode, vnode) {
     // 第一次渲染后 删除了vm.$el 所以最后要返回新的elm
   } else {
     // 如果标签名不一样  将标签名替换成新的
-    if (oldVnode !== vnode) {
+    if (oldVnode.tag !== vnode.tag) {
       return oldVnode.el.parentNode.replaceChild(createElm(vnode), oldVnode.el);
     }
 
     // 如果标签一样， 比较属性
-    vnode.el = oldVnode.el; // 表示当前新节点复用老节点
+    let el= vnode.el = oldVnode.el; // 表示当前新节点复用老节点(因为标签一样 可以复用 此时新vnode还为执行createEle 所以没有vnode.el)
+    // 如果两个vnode的节点是文本节点，则比较内容
+
+    if(vnode.tag == undefined ){ // 新老都是文本
+        if(oldVnode.text !== vnode.text){
+           el.textContent = vnode.text;
+        }
+        return;
+    }
+    
     patchProps(vnode, oldVnode.data);
+
+
+    let oldChildren = oldVnode.children || []
+    let newChildren  = vnode.children || []   
+    // 双方都有children
+    if(oldChildren.length>0 && newChildren.length >0){
+
+    }else if(newChildren.length > 0){ // 老的没儿子 新的有儿子
+       for(let i = 0; i<newChildren.length ; i++){
+           let child =  createElm( newChildren[i])
+           el.appendChild(child)
+       }
+    }else if(oldChildren.length > 0){ // 老的有儿子  新的没儿子
+       el.innerHTML = ""
+    }
+
+    // 
   }
 }
 
 // 属性的比较  初次渲染时，可以调用此方法，后续更新时也可以调用此方法
-function patchProps(vnode, oldProps) {
+function patchProps(vnode, oldProps={}) {
   let newProps = vnode.data || {};
   let el = vnode.el;
+
+  let newStyle = newProps.style || {}
+  let oldStyel = oldProps.style || {}
+  for (let attr in oldStyel) {
+    if (!newStyle[attr]) {
+      el.style[attr] = ""
+    }
+  }
   // 如果老的有属性而新的没有， 则直接删除老的
   for (let key in oldProps) {
+    // 老的css样式如果新的中不存在，则删除
+
     if (!newProps[key]) {
       el.removeAttribute(key);
     }
   }
-
   //直接用新的生成到元素上
   for (let key in newProps) {
     if (key == "style") {
